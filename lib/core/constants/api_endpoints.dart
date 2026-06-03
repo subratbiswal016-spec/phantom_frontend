@@ -3,12 +3,9 @@ import 'dart:io' show Platform;
 class ApiEndpoints {
   ApiEndpoints._();
   
-  // Base URL - 10.0.2.2 is Android Emulator's alias to host localhost
+  // Base URL - Pointing to the hosted Render backend
   static String get baseUrl {
-
-    // ADB Reverse Port Forwarding is active!
-    // Connect directly to the host via localhost mapped port 5000
-    return 'http://127.0.0.1:5000/api';
+    return 'https://phantom-backend-eli0.onrender.com/api';
   }
   
   // Auth
