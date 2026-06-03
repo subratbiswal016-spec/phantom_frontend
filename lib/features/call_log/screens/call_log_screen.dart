@@ -57,16 +57,29 @@ class CallLogScreen extends ConsumerWidget {
 
           // Call log list
           Expanded(
-            child: callLogs.isEmpty
-                ? _buildEmptyState()
-                : ListView.builder(
-                    padding: const EdgeInsets.symmetric(horizontal: 20),
-                    itemCount: callLogs.length,
-                    itemBuilder: (context, index) {
-                      final entry = callLogs[index];
-                      return _buildCallLogTile(context, entry, index);
-                    },
-                  ),
+            child: RefreshIndicator(
+              onRefresh: () => ref.read(callLogProvider.notifier).loadLogs(),
+              color: PhantomColors.primaryStart,
+              backgroundColor: PhantomColors.bgCardLight,
+              child: callLogs.isEmpty
+                  ? CustomScrollView(
+                      slivers: [
+                        SliverFillRemaining(
+                          hasScrollBody: false,
+                          child: _buildEmptyState(),
+                        ),
+                      ],
+                    )
+                  : ListView.builder(
+                      physics: const AlwaysScrollableScrollPhysics(),
+                      padding: const EdgeInsets.symmetric(horizontal: 20),
+                      itemCount: callLogs.length,
+                      itemBuilder: (context, index) {
+                        final entry = callLogs[index];
+                        return _buildCallLogTile(context, entry, index);
+                      },
+                    ),
+            ),
           ),
         ],
       ),
@@ -168,7 +181,8 @@ class CallLogScreen extends ConsumerWidget {
                   ],
                 ),
                 const SizedBox(height: 4),
-                Row(
+                Wrap(
+                  crossAxisAlignment: WrapCrossAlignment.center,
                   children: [
                     Text(
                       entry.callerPhone,

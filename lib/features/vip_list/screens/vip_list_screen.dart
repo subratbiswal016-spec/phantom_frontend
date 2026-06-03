@@ -115,48 +115,61 @@ class _VipListScreenState extends ConsumerState<VipListScreen> {
 
           // VIP list
           Expanded(
-            child: filteredList.isEmpty
-                ? _buildEmptyState()
-                : ListView.builder(
-                    padding: const EdgeInsets.symmetric(horizontal: 20),
-                    itemCount: filteredList.length,
-                    itemBuilder: (context, index) {
-                      final contact = filteredList[index];
-                      return Dismissible(
-                        key: ValueKey(contact.id),
-                        direction: DismissDirection.endToStart,
-                        background: Container(
-                          margin: const EdgeInsets.symmetric(vertical: 6),
-                          decoration: BoxDecoration(
-                            gradient: PhantomColors.dangerGradient,
-                            borderRadius: BorderRadius.circular(16),
-                          ),
-                          alignment: Alignment.centerRight,
-                          padding: const EdgeInsets.only(right: 20),
-                          child: const Icon(
-                            Icons.delete_rounded,
-                            color: Colors.white,
-                          ),
+            child: RefreshIndicator(
+              onRefresh: () => ref.read(vipListProvider.notifier).loadContacts(),
+              color: PhantomColors.primaryStart,
+              backgroundColor: PhantomColors.bgCardLight,
+              child: filteredList.isEmpty
+                  ? CustomScrollView(
+                      slivers: [
+                        SliverFillRemaining(
+                          hasScrollBody: false,
+                          child: _buildEmptyState(),
                         ),
-                        onDismissed: (_) {
-                          ref
-                              .read(vipListProvider.notifier)
-                              .removeContact(contact.id);
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                              content: Text('${contact.name} removed from VIP'),
-                              backgroundColor: PhantomColors.bgElevated,
-                              behavior: SnackBarBehavior.floating,
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(12),
-                              ),
+                      ],
+                    )
+                  : ListView.builder(
+                      physics: const AlwaysScrollableScrollPhysics(),
+                      padding: const EdgeInsets.symmetric(horizontal: 20),
+                      itemCount: filteredList.length,
+                      itemBuilder: (context, index) {
+                        final contact = filteredList[index];
+                        return Dismissible(
+                          key: ValueKey(contact.id),
+                          direction: DismissDirection.endToStart,
+                          background: Container(
+                            margin: const EdgeInsets.symmetric(vertical: 6),
+                            decoration: BoxDecoration(
+                              gradient: PhantomColors.dangerGradient,
+                              borderRadius: BorderRadius.circular(16),
                             ),
-                          );
-                        },
-                        child: _buildContactTile(contact, index),
-                      );
-                    },
-                  ),
+                            alignment: Alignment.centerRight,
+                            padding: const EdgeInsets.only(right: 20),
+                            child: const Icon(
+                              Icons.delete_rounded,
+                              color: Colors.white,
+                            ),
+                          ),
+                          onDismissed: (_) {
+                            ref
+                                .read(vipListProvider.notifier)
+                                .removeContact(contact.id);
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text('${contact.name} removed from VIP'),
+                                backgroundColor: PhantomColors.bgElevated,
+                                behavior: SnackBarBehavior.floating,
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                              ),
+                            );
+                          },
+                          child: _buildContactTile(contact, index),
+                        );
+                      },
+                    ),
+            ),
           ),
         ],
       ),
@@ -173,6 +186,7 @@ class _VipListScreenState extends ConsumerState<VipListScreen> {
           ],
         ),
         child: FloatingActionButton(
+          heroTag: null,
           onPressed: () => _showAddContactSheet(context),
           backgroundColor: Colors.transparent,
           elevation: 0,
@@ -339,10 +353,11 @@ class _VipListScreenState extends ConsumerState<VipListScreen> {
               right: BorderSide(color: PhantomColors.border),
             ),
           ),
-          child: Padding(
-            padding: const EdgeInsets.all(24),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
+          child: SingleChildScrollView(
+            child: Padding(
+              padding: const EdgeInsets.all(24),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 // Handle bar
@@ -500,12 +515,8 @@ class _VipListScreenState extends ConsumerState<VipListScreen> {
                           if (nameController.text.isNotEmpty &&
                               phoneController.text.isNotEmpty) {
                             ref.read(vipListProvider.notifier).addContact(
-                                  VipContact(
-                                    id: DateTime.now().millisecondsSinceEpoch
-                                        .toString(),
-                                    name: nameController.text,
-                                    phone: phoneController.text,
-                                  ),
+                                  nameController.text,
+                                  phoneController.text,
                                 );
                             Navigator.pop(context);
                           }
@@ -537,6 +548,7 @@ class _VipListScreenState extends ConsumerState<VipListScreen> {
                 const SizedBox(height: 12),
               ],
             ),
+          ),
           ),
         );
       },

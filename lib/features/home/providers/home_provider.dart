@@ -1,8 +1,12 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/network/api_client.dart';
+import '../../../core/constants/api_endpoints.dart';
+import '../../../core/services/call_blocking_service.dart';
+
 /// Invisible mode state
 final invisibleProvider = StateNotifierProvider<InvisibleNotifier, InvisibleState>((ref) {
-  return InvisibleNotifier();
+  return InvisibleNotifier(ref);
 });
 
 class InvisibleState {
@@ -34,19 +38,51 @@ class InvisibleState {
 }
 
 class InvisibleNotifier extends StateNotifier<InvisibleState> {
-  InvisibleNotifier() : super(const InvisibleState(
-    blockedToday: 12,
-    vipCount: 5,
-  ));
+  final Ref ref;
+
+  InvisibleNotifier(this.ref) : super(const InvisibleState()) {
+    loadStatus();
+  }
+
+  Future<void> loadStatus() async {
+    try {
+      final dio = ref.read(dioProvider);
+      final response = await dio.get(ApiEndpoints.invisibleStatus);
+      final data = response.data['data'];
+      if (data != null && mounted) {
+        state = state.copyWith(
+          isInvisible: data['isInvisible'] ?? false,
+          // Let's assume stats aren't currently returned by this endpoint, we will fetch stats in call log
+        );
+      }
+    } catch (e) {
+      print('Failed to load status: $e');
+    }
+  }
 
   Future<void> toggle() async {
     state = state.copyWith(isLoading: true);
-    // TODO: Call API to toggle invisible mode
-    await Future.delayed(const Duration(milliseconds: 500));
-    state = state.copyWith(
-      isInvisible: !state.isInvisible,
-      isLoading: false,
-    );
+    try {
+      final dio = ref.read(dioProvider);
+      final response = await dio.post(ApiEndpoints.invisibleToggle);
+      final data = response.data['data'];
+      if (data != null && mounted) {
+        final newInvisibleState = data['isInvisible'] ?? false;
+        
+        // Sync with Native Android Call Blocker
+        await CallBlockingService.setInvisibleMode(newInvisibleState);
+
+        state = state.copyWith(
+          isInvisible: newInvisibleState,
+          isLoading: false,
+        );
+      }
+    } catch (e) {
+      print('Failed to toggle status: $e');
+      if (mounted) {
+        state = state.copyWith(isLoading: false);
+      }
+    }
   }
 
   void updateStats({int? blockedToday, int? vipCount}) {

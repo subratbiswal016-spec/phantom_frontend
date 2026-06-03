@@ -17,6 +17,8 @@ subprojects {
 }
 subprojects {
     project.evaluationDependsOn(":app")
+    
+    // Subprojects evaluate dynamically without global JVM overrides
 }
 
 tasks.register<Delete>("clean") {

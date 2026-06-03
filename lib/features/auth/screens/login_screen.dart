@@ -5,15 +5,20 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/phantom_button.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:dio/dio.dart';
+import '../../../core/constants/api_endpoints.dart';
+import '../../../core/network/api_client.dart';
 
-class LoginScreen extends StatefulWidget {
+class LoginScreen extends ConsumerStatefulWidget {
   const LoginScreen({super.key});
 
   @override
-  State<LoginScreen> createState() => _LoginScreenState();
+  ConsumerState<LoginScreen> createState() => _LoginScreenState();
 }
 
-class _LoginScreenState extends State<LoginScreen> {
+class _LoginScreenState extends ConsumerState<LoginScreen> {
   final _phoneController = TextEditingController();
   final _otpController = TextEditingController();
   bool _otpSent = false;
@@ -29,22 +34,44 @@ class _LoginScreenState extends State<LoginScreen> {
   Future<void> _sendOtp() async {
     if (_phoneController.text.length < 10) return;
     setState(() => _isLoading = true);
-    // Simulate OTP send
-    await Future.delayed(const Duration(seconds: 1));
-    setState(() {
-      _otpSent = true;
-      _isLoading = false;
-    });
+    
+    try {
+      final dio = ref.read(dioProvider);
+      await dio.post(ApiEndpoints.login, data: {'phone': '+91${_phoneController.text}'});
+      setState(() {
+        _otpSent = true;
+      });
+    } catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Failed to send OTP')));
+    } finally {
+      setState(() => _isLoading = false);
+    }
   }
 
   Future<void> _verifyOtp() async {
     if (_otpController.text.length < 6) return;
     setState(() => _isLoading = true);
-    // Simulate OTP verification
-    await Future.delayed(const Duration(seconds: 1));
-    setState(() => _isLoading = false);
-    if (mounted) {
-      context.go('/home');
+    
+    try {
+      final dio = ref.read(dioProvider);
+      final response = await dio.post(ApiEndpoints.verifyOtp, data: {
+        'phone': '+91${_phoneController.text}',
+        'otp': _otpController.text
+      });
+      
+      final token = response.data['data']['token'];
+      if (token != null) {
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setString('auth_token', token);
+        if (mounted) context.go('/home');
+      }
+    } on DioException catch (e) {
+      final msg = e.response?.data['message'] ?? 'Invalid OTP';
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
+    } catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Error verifying OTP')));
+    } finally {
+      setState(() => _isLoading = false);
     }
   }
 

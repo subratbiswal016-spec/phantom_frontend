@@ -1,4 +1,8 @@
+import 'dart:convert';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+
+import '../../../core/network/api_client.dart';
+import '../../../core/constants/api_endpoints.dart';
 
 class InvisibleSchedule {
   final String id;
@@ -34,6 +38,30 @@ class InvisibleSchedule {
     );
   }
 
+  factory InvisibleSchedule.fromJson(Map<String, dynamic> json) {
+    return InvisibleSchedule(
+      id: json['id']?.toString() ?? '',
+      daysOfWeek: () {
+        final d = json['daysOfWeek'];
+        if (d is String) {
+          try {
+            final decoded = jsonDecode(d) as List;
+            return decoded.map((e) => e as int).toList();
+          } catch (_) {
+            return <int>[];
+          }
+        } else if (d is List) {
+          return d.map((e) => e as int).toList();
+        }
+        return <int>[];
+      }(),
+      startTime: json['startTime'] ?? '00:00',
+      endTime: json['endTime'] ?? '00:00',
+      isActive: json['isActive'] ?? true,
+      label: json['label'],
+    );
+  }
+
   String get daysText {
     const dayNames = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
     if (daysOfWeek.length == 7) return 'Every day';
@@ -52,50 +80,74 @@ class InvisibleSchedule {
 
 final scheduleProvider =
     StateNotifierProvider<ScheduleNotifier, List<InvisibleSchedule>>((ref) {
-  return ScheduleNotifier();
+  return ScheduleNotifier(ref);
 });
 
 class ScheduleNotifier extends StateNotifier<List<InvisibleSchedule>> {
-  ScheduleNotifier()
-      : super([
-          InvisibleSchedule(
-            id: '1',
-            daysOfWeek: [7],
-            startTime: '10:00',
-            endTime: '18:00',
-            isActive: true,
-            label: 'Sunday Rest',
-          ),
-          InvisibleSchedule(
-            id: '2',
-            daysOfWeek: [1, 2, 3, 4, 5],
-            startTime: '22:00',
-            endTime: '07:00',
-            isActive: true,
-            label: 'Night Sleep',
-          ),
-          InvisibleSchedule(
-            id: '3',
-            daysOfWeek: [6],
-            startTime: '14:00',
-            endTime: '17:00',
-            isActive: false,
-            label: 'Saturday Nap',
-          ),
-        ]);
+  final Ref ref;
 
-  void addSchedule(InvisibleSchedule schedule) {
-    state = [...state, schedule];
+  ScheduleNotifier(this.ref) : super([]) {
+    loadSchedules();
   }
 
-  void removeSchedule(String id) {
-    state = state.where((s) => s.id != id).toList();
+  Future<void> loadSchedules() async {
+    try {
+      final dio = ref.read(dioProvider);
+      final response = await dio.get(ApiEndpoints.scheduleList);
+      final List<dynamic> data = response.data['data'] ?? [];
+      state = data.map((json) => InvisibleSchedule.fromJson(json)).toList();
+    } catch (e) {
+      print('Failed to load schedules: $e');
+    }
   }
 
-  void toggleSchedule(String id) {
+  Future<void> addSchedule(String startTime, String endTime, List<int> days, String label) async {
+    try {
+      final dio = ref.read(dioProvider);
+      await dio.post(ApiEndpoints.scheduleSet, data: {
+        'startTime': startTime,
+        'endTime': endTime,
+        'daysOfWeek': days,
+        'label': label,
+      });
+      await loadSchedules();
+    } catch (e) {
+      print('Failed to add schedule: $e');
+    }
+  }
+
+  Future<void> removeSchedule(String id) async {
+    try {
+      final dio = ref.read(dioProvider);
+      await dio.delete(ApiEndpoints.scheduleDelete(id));
+      state = state.where((s) => s.id != id).toList();
+    } catch (e) {
+      print('Failed to remove schedule: $e');
+    }
+  }
+
+  Future<void> toggleSchedule(String id) async {
+    final schedule = state.firstWhere((s) => s.id == id);
+    final isActive = !schedule.isActive;
+    
+    // Optimistic update
     state = state.map((s) {
-      if (s.id == id) return s.copyWith(isActive: !s.isActive);
+      if (s.id == id) return s.copyWith(isActive: isActive);
       return s;
     }).toList();
+
+    try {
+      final dio = ref.read(dioProvider);
+      await dio.put(ApiEndpoints.scheduleUpdate(id), data: {
+        'isActive': isActive,
+      });
+    } catch (e) {
+      print('Failed to toggle schedule: $e');
+      // Revert on failure
+      state = state.map((s) {
+        if (s.id == id) return s.copyWith(isActive: !isActive);
+        return s;
+      }).toList();
+    }
   }
 }

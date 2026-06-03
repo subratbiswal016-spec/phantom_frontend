@@ -6,8 +6,9 @@ import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/phantom_card.dart';
 import '../../../core/widgets/phantom_app_bar.dart';
 import '../../../core/constants/app_constants.dart';
+import 'package:go_router/go_router.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../providers/settings_provider.dart';
-
 class SettingsScreen extends ConsumerWidget {
   const SettingsScreen({super.key});
 
@@ -16,11 +17,16 @@ class SettingsScreen extends ConsumerWidget {
     return Scaffold(
       backgroundColor: PhantomColors.bgDark,
       appBar: const PhantomAppBar(title: 'Settings'),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.symmetric(horizontal: 20),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
+      body: RefreshIndicator(
+        onRefresh: () => ref.read(settingsProvider.notifier).loadSettings(),
+        color: PhantomColors.primaryStart,
+        backgroundColor: PhantomColors.bgCardLight,
+        child: SingleChildScrollView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          padding: const EdgeInsets.symmetric(horizontal: 20),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
             const SizedBox(height: 8),
 
             // Profile card
@@ -111,106 +117,119 @@ class SettingsScreen extends ConsumerWidget {
 
             const SizedBox(height: 24),
 
-            // Settings sections
-            _buildSectionTitle('Invisible Mode'),
-            const SizedBox(height: 8),
-            _buildSettingsTile(
-              icon: Icons.message_rounded,
-              iconColor: PhantomColors.accent,
-              title: 'Custom Message',
-              subtitle: 'Set what callers hear',
-              trailing: const Icon(
-                Icons.chevron_right_rounded,
-                color: PhantomColors.textTertiary,
-              ),
-              onTap: () => _showCustomMessageSheet(context),
-            ),
-            _buildSettingsTile(
-              icon: Icons.phone_android_rounded,
-              iconColor: PhantomColors.success,
-              title: 'Virtual Number',
-              subtitle: '+91 80000 12345',
-              trailing: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                decoration: BoxDecoration(
-                  color: PhantomColors.success.withValues(alpha: 0.12),
-                  borderRadius: BorderRadius.circular(6),
-                ),
-                child: Text(
-                  'Active',
-                  style: GoogleFonts.inter(
-                    fontSize: 10,
-                    fontWeight: FontWeight.w600,
-                    color: PhantomColors.success,
-                  ),
-                ),
-              ),
-            ),
-
-            _buildSectionTitle('Call Blocking'),
-            const SizedBox(height: 8),
             Consumer(
               builder: (context, ref, child) {
                 final settingsState = ref.watch(settingsProvider);
                 
-                return _buildSettingsTile(
-                  icon: Icons.contact_phone_rounded,
-                  iconColor: PhantomColors.danger,
-                  title: 'Block Unknown Numbers',
-                  subtitle: settingsState.isSyncing 
-                      ? 'Syncing contacts...' 
-                      : 'Block callers not in your contacts',
-                  trailing: settingsState.isSyncing
-                      ? const SizedBox(
-                          width: 20,
-                          height: 20,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            color: PhantomColors.danger,
-                          ),
-                        )
-                      : Switch(
-                          value: settingsState.blockUnknown,
-                          onChanged: (_) {
-                            ref.read(settingsProvider.notifier).toggleBlockUnknown();
-                          },
-                          activeColor: PhantomColors.danger,
-                          activeTrackColor: PhantomColors.danger.withValues(alpha: 0.3),
-                          inactiveThumbColor: PhantomColors.textTertiary,
-                          inactiveTrackColor: PhantomColors.bgElevated,
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Settings sections
+                    _buildSectionTitle('Invisible Mode'),
+                    const SizedBox(height: 8),
+                    _buildSettingsTile(
+                      icon: Icons.message_rounded,
+                      iconColor: PhantomColors.accent,
+                      title: 'Custom Message',
+                      subtitle: settingsState.customMessage.length > 25 
+                          ? '${settingsState.customMessage.substring(0, 25)}...' 
+                          : settingsState.customMessage,
+                      trailing: const Icon(
+                        Icons.chevron_right_rounded,
+                        color: PhantomColors.textTertiary,
+                      ),
+                      onTap: () => _showCustomMessageSheet(context, ref),
+                    ),
+                    _buildSettingsTile(
+                      icon: Icons.phone_android_rounded,
+                      iconColor: PhantomColors.success,
+                      title: 'Virtual Number',
+                      subtitle: '+91 80000 12345',
+                      trailing: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: PhantomColors.success.withValues(alpha: 0.12),
+                          borderRadius: BorderRadius.circular(6),
                         ),
+                        child: Text(
+                          'Active',
+                          style: GoogleFonts.inter(
+                            fontSize: 10,
+                            fontWeight: FontWeight.w600,
+                            color: PhantomColors.success,
+                          ),
+                        ),
+                      ),
+                    ),
+
+                    _buildSectionTitle('Call Blocking'),
+                    const SizedBox(height: 8),
+                    _buildSettingsTile(
+                      icon: Icons.contact_phone_rounded,
+                      iconColor: PhantomColors.danger,
+                      title: 'Block Unknown Numbers',
+                      subtitle: settingsState.isSyncing 
+                          ? 'Syncing contacts...' 
+                          : 'Block callers not in your contacts',
+                      trailing: settingsState.isSyncing
+                          ? const SizedBox(
+                              width: 20,
+                              height: 20,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: PhantomColors.danger,
+                              ),
+                            )
+                          : Switch(
+                              value: settingsState.blockUnknown,
+                              onChanged: (_) {
+                                ref.read(settingsProvider.notifier).toggleBlockUnknown();
+                              },
+                              activeColor: PhantomColors.danger,
+                              activeTrackColor: PhantomColors.danger.withValues(alpha: 0.3),
+                              inactiveThumbColor: PhantomColors.textTertiary,
+                              inactiveTrackColor: PhantomColors.bgElevated,
+                            ),
+                    ),
+
+                    const SizedBox(height: 24),
+
+                    _buildSectionTitle('Notifications'),
+                    const SizedBox(height: 8),
+                    _buildSettingsTile(
+                      icon: Icons.notifications_rounded,
+                      iconColor: PhantomColors.warning,
+                      title: 'Push Notifications',
+                      subtitle: 'Get notified when VIPs call',
+                      trailing: Switch(
+                        value: settingsState.pushNotifications,
+                        onChanged: (val) {
+                          ref.read(settingsProvider.notifier).togglePushNotifications(val);
+                        },
+                        activeColor: PhantomColors.primaryStart,
+                        activeTrackColor:
+                            PhantomColors.primaryStart.withValues(alpha: 0.3),
+                      ),
+                    ),
+                    _buildSettingsTile(
+                      icon: Icons.notifications_active_rounded,
+                      iconColor: PhantomColors.accent,
+                      title: 'Blocked Call Alerts',
+                      subtitle: 'Summary of blocked calls',
+                      trailing: Switch(
+                        value: settingsState.blockedCallAlerts,
+                        onChanged: (val) {
+                          ref.read(settingsProvider.notifier).toggleBlockedCallAlerts(val);
+                        },
+                        activeColor: PhantomColors.accent,
+                        activeTrackColor: PhantomColors.accent.withValues(alpha: 0.3),
+                        inactiveThumbColor: PhantomColors.textTertiary,
+                        inactiveTrackColor: PhantomColors.bgElevated,
+                      ),
+                    ),
+                  ],
                 );
               },
-            ),
-
-            const SizedBox(height: 24),
-
-            _buildSectionTitle('Notifications'),
-            const SizedBox(height: 8),
-            _buildSettingsTile(
-              icon: Icons.notifications_rounded,
-              iconColor: PhantomColors.warning,
-              title: 'Push Notifications',
-              subtitle: 'Get notified when VIPs call',
-              trailing: Switch(
-                value: true,
-                onChanged: (_) {},
-                activeColor: PhantomColors.primaryStart,
-                activeTrackColor:
-                    PhantomColors.primaryStart.withValues(alpha: 0.3),
-              ),
-            ),
-            _buildSettingsTile(
-              icon: Icons.notifications_active_rounded,
-              iconColor: PhantomColors.accent,
-              title: 'Blocked Call Alerts',
-              subtitle: 'Summary of blocked calls',
-              trailing: Switch(
-                value: false,
-                onChanged: (_) {},
-                inactiveThumbColor: PhantomColors.textTertiary,
-                inactiveTrackColor: PhantomColors.bgElevated,
-              ),
             ),
 
             const SizedBox(height: 24),
@@ -226,6 +245,11 @@ class SettingsScreen extends ConsumerWidget {
                 Icons.chevron_right_rounded,
                 color: PhantomColors.textTertiary,
               ),
+              onTap: () {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Privacy Policy: Your data is secure and encrypted.')),
+                );
+              },
             ),
             _buildSettingsTile(
               icon: Icons.help_rounded,
@@ -236,6 +260,11 @@ class SettingsScreen extends ConsumerWidget {
                 Icons.chevron_right_rounded,
                 color: PhantomColors.textTertiary,
               ),
+              onTap: () {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Help & Support: Contact us at support@phantom.app')),
+                );
+              },
             ),
             _buildSettingsTile(
               icon: Icons.info_rounded,
@@ -246,37 +275,51 @@ class SettingsScreen extends ConsumerWidget {
                 Icons.chevron_right_rounded,
                 color: PhantomColors.textTertiary,
               ),
+              onTap: () {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Phantom App v1.0.0 - Built with Flutter')),
+                );
+              },
             ),
 
             const SizedBox(height: 16),
 
             // Logout
-            PhantomCard(
-              onTap: () {},
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  const Icon(
-                    Icons.logout_rounded,
-                    color: PhantomColors.danger,
-                    size: 20,
+            Consumer(
+              builder: (context, ref, child) {
+                return PhantomCard(
+                  onTap: () async {
+                    final prefs = await SharedPreferences.getInstance();
+                    await prefs.remove('auth_token');
+                    if (context.mounted) context.go('/login');
+                  },
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      const Icon(
+                        Icons.logout_rounded,
+                        color: PhantomColors.danger,
+                        size: 20,
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        'Log Out',
+                        style: GoogleFonts.inter(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w600,
+                          color: PhantomColors.danger,
+                        ),
+                      ),
+                    ],
                   ),
-                  const SizedBox(width: 8),
-                  Text(
-                    'Log Out',
-                    style: GoogleFonts.inter(
-                      fontSize: 15,
-                      fontWeight: FontWeight.w600,
-                      color: PhantomColors.danger,
-                    ),
-                  ),
-                ],
-              ),
+                );
+              },
             ),
 
             const SizedBox(height: 32),
           ],
         ),
+      ),
       ),
     );
   }
@@ -446,9 +489,10 @@ class SettingsScreen extends ConsumerWidget {
     );
   }
 
-  void _showCustomMessageSheet(BuildContext context) {
+  void _showCustomMessageSheet(BuildContext context, WidgetRef ref) {
+    final settingsState = ref.read(settingsProvider);
     final messageController = TextEditingController(
-      text: 'The number you are trying to reach is currently switched off.',
+      text: settingsState.customMessage,
     );
 
     showModalBottomSheet(
@@ -532,7 +576,10 @@ class SettingsScreen extends ConsumerWidget {
                     child: Material(
                       color: Colors.transparent,
                       child: InkWell(
-                        onTap: () => Navigator.pop(context),
+                        onTap: () {
+                          ref.read(settingsProvider.notifier).updateCustomMessage(messageController.text);
+                          Navigator.pop(context);
+                        },
                         borderRadius: BorderRadius.circular(14),
                         child: Center(
                           child: Text(
