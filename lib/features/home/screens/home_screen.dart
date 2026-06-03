@@ -65,8 +65,19 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
           ),
         ),
         child: SafeArea(
-          child: Column(
-            children: [
+          child: RefreshIndicator(
+            color: PhantomColors.primaryStart,
+            backgroundColor: PhantomColors.bgElevated,
+            onRefresh: () async {
+              await ref.read(invisibleProvider.notifier).refreshStats();
+            },
+            child: CustomScrollView(
+              physics: const AlwaysScrollableScrollPhysics(),
+              slivers: [
+                SliverFillRemaining(
+                  hasScrollBody: false,
+                  child: Column(
+                    children: [
               // Header
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
@@ -256,6 +267,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                                 fontWeight: FontWeight.w500,
                                 color: PhantomColors.textPrimary,
                               ),
+                              overflow: TextOverflow.ellipsis,
+                              maxLines: 1,
                             ),
                           ],
                         ),
@@ -270,7 +283,11 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
               ).animate().fadeIn(delay: 500.ms, duration: 500.ms),
 
               const SizedBox(height: 20),
-            ],
+                    ],
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       ),

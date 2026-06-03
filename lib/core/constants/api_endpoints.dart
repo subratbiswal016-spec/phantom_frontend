@@ -1,9 +1,17 @@
+
+
 class ApiEndpoints {
   ApiEndpoints._();
   
   // Base URL - Change this to your server URL
-  static const String baseUrl = 'http://localhost:5000/api';
-  
+  static String get baseUrl {
+    // if (Platform.isAndroid) {
+    //   return 'http://192.168.0.73:5000/api';
+    // }
+    // return 'http://localhost:5000/api';
+    return 'https://phantom-backend-eli0.onrender.com/api';
+  }
+
   // Auth
   static const String login = '/auth/login';
   static const String verifyOtp = '/auth/verify';

@@ -2,11 +2,14 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:go_router/go_router.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/phantom_card.dart';
 import '../../../core/widgets/phantom_app_bar.dart';
 import '../../../core/constants/app_constants.dart';
 import '../providers/settings_provider.dart';
+import '../../auth/providers/auth_provider.dart';
+import 'payment_simulation_screen.dart';
 
 class SettingsScreen extends ConsumerWidget {
   const SettingsScreen({super.key});
@@ -16,9 +19,16 @@ class SettingsScreen extends ConsumerWidget {
     return Scaffold(
       backgroundColor: PhantomColors.bgDark,
       appBar: const PhantomAppBar(title: 'Settings'),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.symmetric(horizontal: 20),
-        child: Column(
+      body: RefreshIndicator(
+        color: PhantomColors.primaryStart,
+        backgroundColor: PhantomColors.bgElevated,
+        onRefresh: () async {
+          await ref.read(settingsProvider.notifier).loadSettings();
+        },
+        child: SingleChildScrollView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          padding: const EdgeInsets.symmetric(horizontal: 20),
+          child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             const SizedBox(height: 8),
@@ -106,10 +116,9 @@ class SettingsScreen extends ConsumerWidget {
 
             // Subscription section
             _buildSectionTitle('Subscription'),
-            const SizedBox(height: 8),
-            _buildSubscriptionCard(context),
-
-            const SizedBox(height: 24),
+            const SizedBox(height: 16),
+            _buildSubscriptionCard(context, ref),
+            const SizedBox(height: 32),
 
             // Settings sections
             _buildSectionTitle('Invisible Mode'),
@@ -153,32 +162,52 @@ class SettingsScreen extends ConsumerWidget {
               builder: (context, ref, child) {
                 final settingsState = ref.watch(settingsProvider);
                 
-                return _buildSettingsTile(
-                  icon: Icons.contact_phone_rounded,
-                  iconColor: PhantomColors.danger,
-                  title: 'Block Unknown Numbers',
-                  subtitle: settingsState.isSyncing 
-                      ? 'Syncing contacts...' 
-                      : 'Block callers not in your contacts',
-                  trailing: settingsState.isSyncing
-                      ? const SizedBox(
-                          width: 20,
-                          height: 20,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            color: PhantomColors.danger,
-                          ),
-                        )
-                      : Switch(
-                          value: settingsState.blockUnknown,
-                          onChanged: (_) {
-                            ref.read(settingsProvider.notifier).toggleBlockUnknown();
-                          },
-                          activeColor: PhantomColors.danger,
-                          activeTrackColor: PhantomColors.danger.withValues(alpha: 0.3),
-                          inactiveThumbColor: PhantomColors.textTertiary,
-                          inactiveTrackColor: PhantomColors.bgElevated,
-                        ),
+                return Column(
+                  children: [
+                    _buildSettingsTile(
+                      icon: Icons.contact_phone_rounded,
+                      iconColor: PhantomColors.danger,
+                      title: 'Block Unknown Numbers',
+                      subtitle: settingsState.isSyncing 
+                          ? 'Syncing contacts...' 
+                          : 'Block callers not in your contacts',
+                      trailing: settingsState.isSyncing
+                          ? const SizedBox(
+                              width: 20,
+                              height: 20,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: PhantomColors.danger,
+                              ),
+                            )
+                          : Switch(
+                              value: settingsState.blockUnknown,
+                              onChanged: (_) {
+                                ref.read(settingsProvider.notifier).toggleBlockUnknown();
+                              },
+                              activeColor: PhantomColors.danger,
+                              activeTrackColor: PhantomColors.danger.withValues(alpha: 0.3),
+                              inactiveThumbColor: PhantomColors.textTertiary,
+                              inactiveTrackColor: PhantomColors.bgElevated,
+                            ),
+                    ),
+                    _buildSettingsTile(
+                      icon: Icons.settings_phone_rounded,
+                      iconColor: PhantomColors.primaryStart,
+                      title: 'Direct SIM Call Blocking',
+                      subtitle: 'Block calls on physical SIM directly',
+                      trailing: Switch(
+                        value: settingsState.blockDirectCalls,
+                        onChanged: (_) {
+                          ref.read(settingsProvider.notifier).toggleBlockDirectCalls();
+                        },
+                        activeColor: PhantomColors.primaryStart,
+                        activeTrackColor: PhantomColors.primaryStart.withValues(alpha: 0.3),
+                        inactiveThumbColor: PhantomColors.textTertiary,
+                        inactiveTrackColor: PhantomColors.bgElevated,
+                      ),
+                    ),
+                  ],
                 );
               },
             ),
@@ -187,30 +216,46 @@ class SettingsScreen extends ConsumerWidget {
 
             _buildSectionTitle('Notifications'),
             const SizedBox(height: 8),
-            _buildSettingsTile(
-              icon: Icons.notifications_rounded,
-              iconColor: PhantomColors.warning,
-              title: 'Push Notifications',
-              subtitle: 'Get notified when VIPs call',
-              trailing: Switch(
-                value: true,
-                onChanged: (_) {},
-                activeColor: PhantomColors.primaryStart,
-                activeTrackColor:
-                    PhantomColors.primaryStart.withValues(alpha: 0.3),
-              ),
-            ),
-            _buildSettingsTile(
-              icon: Icons.notifications_active_rounded,
-              iconColor: PhantomColors.accent,
-              title: 'Blocked Call Alerts',
-              subtitle: 'Summary of blocked calls',
-              trailing: Switch(
-                value: false,
-                onChanged: (_) {},
-                inactiveThumbColor: PhantomColors.textTertiary,
-                inactiveTrackColor: PhantomColors.bgElevated,
-              ),
+            Consumer(
+              builder: (context, ref, child) {
+                final settingsState = ref.watch(settingsProvider);
+                return Column(
+                  children: [
+                    _buildSettingsTile(
+                      icon: Icons.notifications_rounded,
+                      iconColor: PhantomColors.warning,
+                      title: 'Push Notifications',
+                      subtitle: 'Get notified when VIPs call',
+                      trailing: Switch(
+                        value: settingsState.pushNotifications,
+                        onChanged: (_) {
+                          ref.read(settingsProvider.notifier).togglePushNotifications();
+                        },
+                        activeColor: PhantomColors.primaryStart,
+                        activeTrackColor:
+                            PhantomColors.primaryStart.withValues(alpha: 0.3),
+                      ),
+                    ),
+                    _buildSettingsTile(
+                      icon: Icons.notifications_active_rounded,
+                      iconColor: PhantomColors.accent,
+                      title: 'Blocked Call Alerts',
+                      subtitle: 'Summary of blocked calls',
+                      trailing: Switch(
+                        value: settingsState.blockedCallAlerts,
+                        onChanged: (_) {
+                          ref.read(settingsProvider.notifier).toggleBlockedCallAlerts();
+                        },
+                        activeColor: PhantomColors.accent,
+                        activeTrackColor:
+                            PhantomColors.accent.withValues(alpha: 0.3),
+                        inactiveThumbColor: PhantomColors.textTertiary,
+                        inactiveTrackColor: PhantomColors.bgElevated,
+                      ),
+                    ),
+                  ],
+                );
+              },
             ),
 
             const SizedBox(height: 24),
@@ -226,6 +271,7 @@ class SettingsScreen extends ConsumerWidget {
                 Icons.chevron_right_rounded,
                 color: PhantomColors.textTertiary,
               ),
+              onTap: () => _showPrivacyPolicy(context),
             ),
             _buildSettingsTile(
               icon: Icons.help_rounded,
@@ -236,6 +282,7 @@ class SettingsScreen extends ConsumerWidget {
                 Icons.chevron_right_rounded,
                 color: PhantomColors.textTertiary,
               ),
+              onTap: () => _showHelpSupport(context),
             ),
             _buildSettingsTile(
               icon: Icons.info_rounded,
@@ -246,13 +293,19 @@ class SettingsScreen extends ConsumerWidget {
                 Icons.chevron_right_rounded,
                 color: PhantomColors.textTertiary,
               ),
+              onTap: () => _showAbout(context),
             ),
 
             const SizedBox(height: 16),
 
             // Logout
             PhantomCard(
-              onTap: () {},
+              onTap: () async {
+                await ref.read(authProvider.notifier).logout();
+                if (context.mounted) {
+                  context.go('/login');
+                }
+              },
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
@@ -278,8 +331,9 @@ class SettingsScreen extends ConsumerWidget {
           ],
         ),
       ),
-    );
-  }
+    ),
+  );
+}
 
   Widget _buildSectionTitle(String title) {
     return Text(
@@ -343,7 +397,10 @@ class SettingsScreen extends ConsumerWidget {
     );
   }
 
-  Widget _buildSubscriptionCard(BuildContext context) {
+  Widget _buildSubscriptionCard(BuildContext context, WidgetRef ref) {
+    final state = ref.watch(settingsProvider);
+    final currentTier = state.subscriptionTier;
+
     return PhantomCard(
       padding: const EdgeInsets.all(0),
       child: Column(
@@ -353,13 +410,13 @@ class SettingsScreen extends ConsumerWidget {
             padding: const EdgeInsets.all(16),
             child: Column(
               children: [
-                _buildPlanRow('Free', '₹0/mo', '3 VIPs', false),
+                _buildPlanRow(context, 'Free', '₹0', '3 VIPs', currentTier == 'free'),
                 const Divider(color: PhantomColors.border, height: 1),
-                _buildPlanRow('Basic', '₹${AppConstants.basicPrice}/mo', '10 VIPs + Schedule', false),
+                _buildPlanRow(context, 'Basic', '₹${AppConstants.basicPrice}', '10 VIPs + Schedule', currentTier == 'basic'),
                 const Divider(color: PhantomColors.border, height: 1),
-                _buildPlanRow('Pro', '₹${AppConstants.proPrice}/mo', 'Unlimited + Custom Msg', true),
+                _buildPlanRow(context, 'Pro', '₹${AppConstants.proPrice}', 'Unlimited + Custom Msg', currentTier == 'pro'),
                 const Divider(color: PhantomColors.border, height: 1),
-                _buildPlanRow('Business', '₹${AppConstants.businessPrice}/mo', 'Team Accounts', false),
+                _buildPlanRow(context, 'Business', '₹${AppConstants.businessPrice}', 'Team Accounts', currentTier == 'business'),
               ],
             ),
           ),
@@ -368,12 +425,24 @@ class SettingsScreen extends ConsumerWidget {
     );
   }
 
-  Widget _buildPlanRow(String name, String price, String feature, bool isCurrent) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 12),
-      child: Row(
-        children: [
-          Container(
+  Widget _buildPlanRow(BuildContext context, String name, String price, String feature, bool isCurrent) {
+    return InkWell(
+      onTap: isCurrent ? null : () {
+        Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (context) => PaymentSimulationScreen(
+              tierName: name,
+              price: '$price/mo',
+            ),
+          ),
+        );
+      },
+      borderRadius: BorderRadius.circular(8),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 4),
+        child: Row(
+          children: [
+            Container(
             width: 8,
             height: 8,
             decoration: BoxDecoration(
@@ -443,8 +512,9 @@ class SettingsScreen extends ConsumerWidget {
           ),
         ],
       ),
-    );
-  }
+    ),
+  );
+}
 
   void _showCustomMessageSheet(BuildContext context) {
     final messageController = TextEditingController(
@@ -554,6 +624,232 @@ class SettingsScreen extends ConsumerWidget {
           ),
         );
       },
+    );
+  }
+
+  void _showPrivacyPolicy(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => Container(
+        padding: const EdgeInsets.all(24),
+        decoration: const BoxDecoration(
+          color: PhantomColors.bgCard,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+          border: Border(top: BorderSide(color: PhantomColors.border)),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Center(
+              child: Container(
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: PhantomColors.bgElevated,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+            ),
+            const SizedBox(height: 20),
+            Row(
+              children: [
+                const Icon(Icons.privacy_tip_rounded, color: PhantomColors.primaryStart, size: 24),
+                const SizedBox(width: 10),
+                Text(
+                  'Privacy Policy',
+                  style: GoogleFonts.outfit(
+                    fontSize: 22,
+                    fontWeight: FontWeight.w700,
+                    color: PhantomColors.textPrimary,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            Text(
+              'Your privacy is our priority. Phantom does not store, upload, or sell your contacts or personal call details to third parties.',
+              style: GoogleFonts.inter(fontSize: 14, color: PhantomColors.textSecondary, height: 1.5),
+            ),
+            const SizedBox(height: 12),
+            Text(
+              '• Contact Sync: We process contact details locally and only upload hashed values for VIP lookups.\n• Audio & Calls: No audio or actual call contents are recorded or intercepted by Phantom servers.\n• Logs: Temporary logs are cleared weekly.',
+              style: GoogleFonts.inter(fontSize: 13, color: PhantomColors.textSecondary, height: 1.6),
+            ),
+            const SizedBox(height: 24),
+            SizedBox(
+              width: double.infinity,
+              height: 48,
+              child: ElevatedButton(
+                onPressed: () => Navigator.pop(context),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: PhantomColors.bgElevated,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                ),
+                child: Text('Close', style: GoogleFonts.inter(color: PhantomColors.textPrimary, fontWeight: FontWeight.w600)),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showHelpSupport(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => Container(
+        padding: const EdgeInsets.all(24),
+        decoration: const BoxDecoration(
+          color: PhantomColors.bgCard,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+          border: Border(top: BorderSide(color: PhantomColors.border)),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Center(
+              child: Container(
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: PhantomColors.bgElevated,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+            ),
+            const SizedBox(height: 20),
+            Row(
+              children: [
+                const Icon(Icons.help_rounded, color: PhantomColors.accent, size: 24),
+                const SizedBox(width: 10),
+                Text(
+                  'Help & Support',
+                  style: GoogleFonts.outfit(
+                    fontSize: 22,
+                    fontWeight: FontWeight.w700,
+                    color: PhantomColors.textPrimary,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            Text(
+              'Frequently Asked Questions:',
+              style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.w700, color: PhantomColors.textPrimary),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Q: How does Invisible Mode work?\nA: When activated, we route calls to a dummy number that returns a "switched off" tone, bypassing all except VIPs.\n\nQ: How can I contact support?\nA: Reach out to us at support@phantom.app or raise a ticket.',
+              style: GoogleFonts.inter(fontSize: 13, color: PhantomColors.textSecondary, height: 1.5),
+            ),
+            const SizedBox(height: 24),
+            SizedBox(
+              width: double.infinity,
+              height: 48,
+              child: ElevatedButton(
+                onPressed: () => Navigator.pop(context),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: PhantomColors.bgElevated,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                ),
+                child: Text('Got It', style: GoogleFonts.inter(color: PhantomColors.textPrimary, fontWeight: FontWeight.w600)),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showAbout(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => Container(
+        padding: const EdgeInsets.all(24),
+        decoration: const BoxDecoration(
+          color: PhantomColors.bgCard,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+          border: Border(top: BorderSide(color: PhantomColors.border)),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Center(
+              child: Container(
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: PhantomColors.bgElevated,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+            ),
+            const SizedBox(height: 20),
+            Center(
+              child: Column(
+                children: [
+                  Container(
+                    width: 64,
+                    height: 64,
+                    decoration: BoxDecoration(
+                      gradient: PhantomColors.primaryGradient,
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                    child: const Icon(Icons.visibility_off_rounded, color: Colors.white, size: 36),
+                  ),
+                  const SizedBox(height: 14),
+                  Text(
+                    'Phantom',
+                    style: GoogleFonts.outfit(
+                      fontSize: 24,
+                      fontWeight: FontWeight.w800,
+                      color: PhantomColors.textPrimary,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    'Version 1.0.0 (Build 26)',
+                    style: GoogleFonts.inter(
+                      fontSize: 13,
+                      color: PhantomColors.textSecondary,
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  Text(
+                    '© 2026 Phantom Labs Inc. All rights reserved.',
+                    style: GoogleFonts.inter(
+                      fontSize: 12,
+                      color: PhantomColors.textTertiary,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 24),
+            SizedBox(
+              width: double.infinity,
+              height: 48,
+              child: ElevatedButton(
+                onPressed: () => Navigator.pop(context),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: PhantomColors.bgElevated,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                ),
+                child: Text('Close', style: GoogleFonts.inter(color: PhantomColors.textPrimary, fontWeight: FontWeight.w600)),
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

@@ -1,4 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../../core/network/api_client.dart';
+import '../../../core/constants/api_endpoints.dart';
 
 class VipContact {
   final String id;
@@ -14,28 +16,79 @@ class VipContact {
     this.avatar,
     DateTime? addedAt,
   }) : addedAt = addedAt ?? DateTime.now();
+
+  factory VipContact.fromJson(Map<String, dynamic> json) {
+    return VipContact(
+      id: json['id']?.toString() ?? '',
+      name: json['name'] ?? '',
+      phone: json['phone'] ?? '',
+      avatar: json['avatar'],
+      addedAt: json['createdAt'] != null
+          ? DateTime.tryParse(json['createdAt']) ?? DateTime.now()
+          : DateTime.now(),
+    );
+  }
 }
 
 final vipListProvider = StateNotifierProvider<VipListNotifier, List<VipContact>>((ref) {
-  return VipListNotifier();
+  return VipListNotifier(ref);
 });
 
 class VipListNotifier extends StateNotifier<List<VipContact>> {
-  VipListNotifier()
-      : super([
-          VipContact(id: '1', name: 'Mom', phone: '+91 98765 43210'),
-          VipContact(id: '2', name: 'Dad', phone: '+91 98765 43211'),
-          VipContact(id: '3', name: 'Boss', phone: '+91 98765 43212'),
-          VipContact(id: '4', name: 'Best Friend', phone: '+91 98765 43213'),
-          VipContact(id: '5', name: 'Wife', phone: '+91 98765 43214'),
-        ]);
+  final Ref ref;
 
-  void addContact(VipContact contact) {
-    state = [...state, contact];
+  VipListNotifier(this.ref) : super([]) {
+    fetchList();
   }
 
-  void removeContact(String id) {
+  Future<void> fetchList() async {
+    try {
+      final dio = ref.read(dioProvider);
+      final response = await dio.get(ApiEndpoints.vipList);
+      final List? data = response.data['data'];
+      if (mounted) {
+        state = data != null ? data.map((json) => VipContact.fromJson(json)).toList() : [];
+      }
+    } catch (e) {
+      print('Failed to fetch VIP contacts: $e');
+    }
+  }
+
+  Future<bool> addContact(String name, String phone) async {
+    try {
+      final dio = ref.read(dioProvider);
+      final response = await dio.post(ApiEndpoints.vipAdd, data: {
+        'name': name,
+        'phone': phone,
+      });
+      final newContactData = response.data['data'];
+      if (mounted && newContactData != null) {
+        final newContact = VipContact.fromJson(newContactData);
+        state = [...state, newContact];
+        return true;
+      }
+      return false;
+    } catch (e) {
+      print('Failed to add VIP contact: $e');
+      return false;
+    }
+  }
+
+  Future<void> removeContact(String id) async {
+    // Optimistic update
+    final originalState = List<VipContact>.from(state);
     state = state.where((c) => c.id != id).toList();
+
+    try {
+      final dio = ref.read(dioProvider);
+      await dio.delete(ApiEndpoints.vipRemove(id));
+    } catch (e) {
+      print('Failed to remove VIP contact: $e');
+      // Revert
+      if (mounted) {
+        state = originalState;
+      }
+    }
   }
 
   void reorderContacts(int oldIndex, int newIndex) {

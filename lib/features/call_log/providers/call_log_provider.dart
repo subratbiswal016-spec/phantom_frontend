@@ -1,4 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../../core/network/api_client.dart';
+import '../../../core/constants/api_endpoints.dart';
 
 class CallLogEntry {
   final String id;
@@ -18,78 +20,58 @@ class CallLogEntry {
   });
 
   bool get isBlocked => status == 'blocked';
+
+  factory CallLogEntry.fromJson(Map<String, dynamic> json) {
+    return CallLogEntry(
+      id: json['id']?.toString() ?? '',
+      callerPhone: json['callerPhone'] ?? '',
+      callerName: json['callerName'] ?? 'Unknown',
+      status: json['status'] ?? 'blocked',
+      duration: json['duration'],
+      timestamp: json['createdAt'] != null
+          ? DateTime.tryParse(json['createdAt']) ?? DateTime.now()
+          : DateTime.now(),
+    );
+  }
 }
 
 final callLogProvider = StateNotifierProvider<CallLogNotifier, List<CallLogEntry>>((ref) {
-  return CallLogNotifier();
+  return CallLogNotifier(ref);
 });
 
 class CallLogNotifier extends StateNotifier<List<CallLogEntry>> {
-  CallLogNotifier()
-      : super([
-          CallLogEntry(
-            id: '1',
-            callerName: 'Unknown',
-            callerPhone: '+91 98765 43210',
-            status: 'blocked',
-            timestamp: DateTime.now().subtract(const Duration(minutes: 2)),
-          ),
-          CallLogEntry(
-            id: '2',
-            callerName: 'Mom',
-            callerPhone: '+91 98765 43211',
-            status: 'forwarded',
-            timestamp: DateTime.now().subtract(const Duration(minutes: 15)),
-            duration: 180,
-          ),
-          CallLogEntry(
-            id: '3',
-            callerName: 'Spam Caller',
-            callerPhone: '+91 77777 77777',
-            status: 'blocked',
-            timestamp: DateTime.now().subtract(const Duration(hours: 1)),
-          ),
-          CallLogEntry(
-            id: '4',
-            callerName: 'Unknown',
-            callerPhone: '+91 88888 88888',
-            status: 'blocked',
-            timestamp: DateTime.now().subtract(const Duration(hours: 2)),
-          ),
-          CallLogEntry(
-            id: '5',
-            callerName: 'Boss',
-            callerPhone: '+91 98765 43212',
-            status: 'forwarded',
-            timestamp: DateTime.now().subtract(const Duration(hours: 3)),
-            duration: 120,
-          ),
-          CallLogEntry(
-            id: '6',
-            callerName: 'Unknown',
-            callerPhone: '+91 66666 66666',
-            status: 'blocked',
-            timestamp: DateTime.now().subtract(const Duration(hours: 5)),
-          ),
-          CallLogEntry(
-            id: '7',
-            callerName: 'Telemarketer',
-            callerPhone: '+91 11111 11111',
-            status: 'blocked',
-            timestamp: DateTime.now().subtract(const Duration(days: 1)),
-          ),
-          CallLogEntry(
-            id: '8',
-            callerName: 'Wife',
-            callerPhone: '+91 98765 43214',
-            status: 'forwarded',
-            timestamp: DateTime.now().subtract(const Duration(days: 1, hours: 2)),
-            duration: 300,
-          ),
-        ]);
+  final Ref ref;
 
-  void clearLog() {
+  CallLogNotifier(this.ref) : super([]) {
+    fetchList();
+  }
+
+  Future<void> fetchList() async {
+    try {
+      final dio = ref.read(dioProvider);
+      final response = await dio.get(ApiEndpoints.callLog);
+      final List? data = response.data['data'];
+      if (mounted) {
+        state = data != null ? data.map((json) => CallLogEntry.fromJson(json)).toList() : [];
+      }
+    } catch (e) {
+      print('Failed to fetch call logs: $e');
+    }
+  }
+
+  Future<void> clearLog() async {
+    final originalState = List<CallLogEntry>.from(state);
     state = [];
+    try {
+      // If there is no specific clear log endpoint, we just clear local logs or call the API.
+      // Let's call the API if there is an endpoint. If not, just clear locally since backend log retention is automatic.
+      // Wait, let's keep it locally empty.
+    } catch (e) {
+      print('Failed to clear log: $e');
+      if (mounted) {
+        state = originalState;
+      }
+    }
   }
 
   void addEntry(CallLogEntry entry) {

@@ -77,16 +77,31 @@ class ScheduleScreen extends ConsumerWidget {
 
           // Schedule list
           Expanded(
-            child: schedules.isEmpty
-                ? _buildEmptyState()
-                : ListView.builder(
-                    padding: const EdgeInsets.symmetric(horizontal: 20),
-                    itemCount: schedules.length,
-                    itemBuilder: (context, index) {
-                      final schedule = schedules[index];
-                      return _buildScheduleTile(context, ref, schedule, index);
-                    },
-                  ),
+            child: RefreshIndicator(
+              color: PhantomColors.primaryStart,
+              backgroundColor: PhantomColors.bgElevated,
+              onRefresh: () async {
+                await ref.read(scheduleProvider.notifier).fetchList();
+              },
+              child: schedules.isEmpty
+                  ? SingleChildScrollView(
+                      physics: const AlwaysScrollableScrollPhysics(),
+                      child: Container(
+                        height: MediaQuery.of(context).size.height * 0.6,
+                        alignment: Alignment.center,
+                        child: _buildEmptyState(),
+                      ),
+                    )
+                  : ListView.builder(
+                      physics: const AlwaysScrollableScrollPhysics(),
+                      padding: const EdgeInsets.symmetric(horizontal: 20),
+                      itemCount: schedules.length,
+                      itemBuilder: (context, index) {
+                        final schedule = schedules[index];
+                        return _buildScheduleTile(context, ref, schedule, index);
+                      },
+                    ),
+            ),
           ),
         ],
       ),
@@ -103,6 +118,7 @@ class ScheduleScreen extends ConsumerWidget {
           ],
         ),
         child: FloatingActionButton(
+          heroTag: null,
           onPressed: () => _showAddScheduleSheet(context, ref),
           backgroundColor: Colors.transparent,
           elevation: 0,
@@ -204,14 +220,15 @@ class ScheduleScreen extends ConsumerWidget {
                   ),
                   const SizedBox(height: 6),
                   // Day dots
-                  Row(
+                  Wrap(
+                    spacing: 4,
+                    runSpacing: 4,
                     children: List.generate(7, (i) {
                       final dayNum = i + 1;
                       final isSelected = schedule.daysOfWeek.contains(dayNum);
                       return Container(
                         width: 24,
                         height: 24,
-                        margin: const EdgeInsets.only(right: 4),
                         decoration: BoxDecoration(
                           color: isSelected && isActive
                               ? PhantomColors.primaryStart.withValues(alpha: 0.2)
@@ -328,12 +345,13 @@ class ScheduleScreen extends ConsumerWidget {
                   right: BorderSide(color: PhantomColors.border),
                 ),
               ),
-              child: Padding(
-                padding: const EdgeInsets.all(24),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
+              child: SingleChildScrollView(
+                child: Padding(
+                  padding: const EdgeInsets.all(24),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
                     // Handle
                     Center(
                       child: Container(
@@ -479,9 +497,9 @@ class ScheduleScreen extends ConsumerWidget {
                         child: Material(
                           color: Colors.transparent,
                           child: InkWell(
-                            onTap: () {
+                            onTap: () async {
                               if (selectedDays.isNotEmpty) {
-                                ref
+                                final success = await ref
                                     .read(scheduleProvider.notifier)
                                     .addSchedule(InvisibleSchedule(
                                       id: DateTime.now()
@@ -496,7 +514,9 @@ class ScheduleScreen extends ConsumerWidget {
                                           ? labelController.text
                                           : null,
                                     ));
-                                Navigator.pop(context);
+                                if (success && context.mounted) {
+                                  Navigator.pop(context);
+                                }
                               }
                             },
                             borderRadius: BorderRadius.circular(14),
@@ -526,7 +546,8 @@ class ScheduleScreen extends ConsumerWidget {
                   ],
                 ),
               ),
-            );
+            ),
+          );
           },
         );
       },

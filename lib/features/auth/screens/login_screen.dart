@@ -3,19 +3,22 @@ import 'package:flutter/services.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:go_router/go_router.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../providers/auth_provider.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/phantom_button.dart';
 
-class LoginScreen extends StatefulWidget {
+class LoginScreen extends ConsumerStatefulWidget {
   const LoginScreen({super.key});
 
   @override
-  State<LoginScreen> createState() => _LoginScreenState();
+  ConsumerState<LoginScreen> createState() => _LoginScreenState();
 }
 
-class _LoginScreenState extends State<LoginScreen> {
+class _LoginScreenState extends ConsumerState<LoginScreen> {
   final _phoneController = TextEditingController();
   final _otpController = TextEditingController();
+  final _nameController = TextEditingController();
   bool _otpSent = false;
   bool _isLoading = false;
 
@@ -23,28 +26,56 @@ class _LoginScreenState extends State<LoginScreen> {
   void dispose() {
     _phoneController.dispose();
     _otpController.dispose();
+    _nameController.dispose();
     super.dispose();
   }
 
   Future<void> _sendOtp() async {
-    if (_phoneController.text.length < 10) return;
+    final phone = _phoneController.text.trim();
+    if (phone.length < 10) return;
+    
+    // Normalize format to start with +
+    String formattedPhone = phone;
+    if (!formattedPhone.startsWith('+')) {
+      formattedPhone = '+$formattedPhone';
+    }
+
     setState(() => _isLoading = true);
-    // Simulate OTP send
-    await Future.delayed(const Duration(seconds: 1));
-    setState(() {
-      _otpSent = true;
-      _isLoading = false;
-    });
+    final success = await ref.read(authProvider.notifier).sendOtp(formattedPhone);
+    setState(() => _isLoading = false);
+    
+    if (success) {
+      setState(() {
+        _otpSent = true;
+      });
+    } else {
+      final error = ref.read(authProvider).error ?? 'Failed to send OTP';
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(error), backgroundColor: PhantomColors.danger),
+      );
+    }
   }
 
   Future<void> _verifyOtp() async {
-    if (_otpController.text.length < 6) return;
+    final otp = _otpController.text.trim();
+    if (otp.length < 6) return;
+
     setState(() => _isLoading = true);
-    // Simulate OTP verification
-    await Future.delayed(const Duration(seconds: 1));
+    final success = await ref.read(authProvider.notifier).verifyOtp(
+          otp,
+          name: _nameController.text.trim().isNotEmpty ? _nameController.text.trim() : null,
+        );
     setState(() => _isLoading = false);
-    if (mounted) {
-      context.go('/home');
+
+    if (success) {
+      if (mounted) {
+        context.go('/home');
+      }
+    } else {
+      final error = ref.read(authProvider).error ?? 'Invalid OTP';
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(error), backgroundColor: PhantomColors.danger),
+      );
     }
   }
 
@@ -89,10 +120,12 @@ class _LoginScreenState extends State<LoginScreen> {
                         ),
                       ],
                     ),
-                    child: const Icon(
-                      Icons.visibility_off_rounded,
-                      size: 36,
-                      color: Colors.white,
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(20),
+                      child: Image.asset(
+                        'assets/images/logo.png',
+                        fit: BoxFit.cover,
+                      ),
                     ),
                   ),
                 ).animate().fadeIn(duration: 400.ms).scale(

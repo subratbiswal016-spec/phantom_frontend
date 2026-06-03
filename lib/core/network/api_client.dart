@@ -1,6 +1,8 @@
 import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../constants/api_endpoints.dart';
+import '../constants/app_constants.dart';
 
 final dioProvider = Provider<Dio>((ref) {
   return ApiClient.createDio();
@@ -21,11 +23,11 @@ class ApiClient {
     // Request interceptor — attach auth token
     dio.interceptors.add(InterceptorsWrapper(
       onRequest: (options, handler) async {
-        // TODO: Get token from secure storage
-        // final token = await SecureStorage.getToken();
-        // if (token != null) {
-        //   options.headers['Authorization'] = 'Bearer $token';
-        // }
+        final prefs = await SharedPreferences.getInstance();
+        final token = prefs.getString(AppConstants.tokenKey);
+        if (token != null) {
+          options.headers['Authorization'] = 'Bearer $token';
+        }
         handler.next(options);
       },
       onResponse: (response, handler) {
