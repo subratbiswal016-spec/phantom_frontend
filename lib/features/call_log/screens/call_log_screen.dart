@@ -137,7 +137,6 @@ class CallLogScreen extends ConsumerWidget {
             ),
           ),
           const SizedBox(width: 14),
-
           // Caller info
           Expanded(
             child: Column(
@@ -147,7 +146,9 @@ class CallLogScreen extends ConsumerWidget {
                   children: [
                     Expanded(
                       child: Text(
-                        entry.callerName,
+                        (entry.callerName.toLowerCase() == 'unknown' || entry.callerName.isEmpty)
+                            ? entry.callerPhone
+                            : entry.callerName,
                         style: GoogleFonts.inter(
                           fontSize: 15,
                           fontWeight: FontWeight.w600,
@@ -184,21 +185,23 @@ class CallLogScreen extends ConsumerWidget {
                 Wrap(
                   crossAxisAlignment: WrapCrossAlignment.center,
                   children: [
-                    Text(
-                      entry.callerPhone,
-                      style: GoogleFonts.inter(
-                        fontSize: 12,
-                        color: PhantomColors.textSecondary,
+                    if (entry.callerName.toLowerCase() != 'unknown' && entry.callerName.isNotEmpty) ...[
+                      Text(
+                        entry.callerPhone,
+                        style: GoogleFonts.inter(
+                          fontSize: 12,
+                          color: PhantomColors.textSecondary,
+                        ),
                       ),
-                    ),
-                    const SizedBox(width: 8),
-                    Text(
-                      '•',
-                      style: GoogleFonts.inter(
-                        color: PhantomColors.textTertiary,
+                      const SizedBox(width: 8),
+                      Text(
+                        '•',
+                        style: GoogleFonts.inter(
+                          color: PhantomColors.textTertiary,
+                        ),
                       ),
-                    ),
-                    const SizedBox(width: 8),
+                      const SizedBox(width: 8),
+                    ],
                     Text(
                       timeStr,
                       style: GoogleFonts.inter(
