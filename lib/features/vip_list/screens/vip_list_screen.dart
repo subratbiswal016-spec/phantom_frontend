@@ -116,19 +116,17 @@ class _VipListScreenState extends ConsumerState<VipListScreen> {
           // VIP list
           Expanded(
             child: RefreshIndicator(
+              onRefresh: () => ref.read(vipListProvider.notifier).loadContacts(),
               color: PhantomColors.primaryStart,
-              backgroundColor: PhantomColors.bgElevated,
-              onRefresh: () async {
-                await ref.read(vipListProvider.notifier).fetchList();
-              },
+              backgroundColor: PhantomColors.bgCardLight,
               child: filteredList.isEmpty
-                  ? SingleChildScrollView(
-                      physics: const AlwaysScrollableScrollPhysics(),
-                      child: Container(
-                        height: MediaQuery.of(context).size.height * 0.6,
-                        alignment: Alignment.center,
-                        child: _buildEmptyState(),
-                      ),
+                  ? CustomScrollView(
+                      slivers: [
+                        SliverFillRemaining(
+                          hasScrollBody: false,
+                          child: _buildEmptyState(),
+                        ),
+                      ],
                     )
                   : ListView.builder(
                       physics: const AlwaysScrollableScrollPhysics(),
@@ -243,8 +241,6 @@ class _VipListScreenState extends ConsumerState<VipListScreen> {
                     fontWeight: FontWeight.w600,
                     color: PhantomColors.textPrimary,
                   ),
-                  overflow: TextOverflow.ellipsis,
-                  maxLines: 1,
                 ),
                 const SizedBox(height: 2),
                 Text(
@@ -253,8 +249,6 @@ class _VipListScreenState extends ConsumerState<VipListScreen> {
                     fontSize: 13,
                     color: PhantomColors.textSecondary,
                   ),
-                  overflow: TextOverflow.ellipsis,
-                  maxLines: 1,
                 ),
               ],
             ),
@@ -359,10 +353,11 @@ class _VipListScreenState extends ConsumerState<VipListScreen> {
               right: BorderSide(color: PhantomColors.border),
             ),
           ),
-          child: Padding(
-            padding: const EdgeInsets.all(24),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
+          child: SingleChildScrollView(
+            child: Padding(
+              padding: const EdgeInsets.all(24),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 // Handle bar
@@ -516,18 +511,14 @@ class _VipListScreenState extends ConsumerState<VipListScreen> {
                     child: Material(
                       color: Colors.transparent,
                       child: InkWell(
-                        onTap: () async {
+                        onTap: () {
                           if (nameController.text.isNotEmpty &&
                               phoneController.text.isNotEmpty) {
-                            final success = await ref
-                                .read(vipListProvider.notifier)
-                                .addContact(
+                            ref.read(vipListProvider.notifier).addContact(
                                   nameController.text,
                                   phoneController.text,
                                 );
-                            if (success && context.mounted) {
-                              Navigator.pop(context);
-                            }
+                            Navigator.pop(context);
                           }
                         },
                         borderRadius: BorderRadius.circular(14),
@@ -557,6 +548,7 @@ class _VipListScreenState extends ConsumerState<VipListScreen> {
                 const SizedBox(height: 12),
               ],
             ),
+          ),
           ),
         );
       },

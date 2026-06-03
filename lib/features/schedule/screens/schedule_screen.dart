@@ -78,19 +78,17 @@ class ScheduleScreen extends ConsumerWidget {
           // Schedule list
           Expanded(
             child: RefreshIndicator(
+              onRefresh: () => ref.read(scheduleProvider.notifier).loadSchedules(),
               color: PhantomColors.primaryStart,
-              backgroundColor: PhantomColors.bgElevated,
-              onRefresh: () async {
-                await ref.read(scheduleProvider.notifier).fetchList();
-              },
+              backgroundColor: PhantomColors.bgCardLight,
               child: schedules.isEmpty
-                  ? SingleChildScrollView(
-                      physics: const AlwaysScrollableScrollPhysics(),
-                      child: Container(
-                        height: MediaQuery.of(context).size.height * 0.6,
-                        alignment: Alignment.center,
-                        child: _buildEmptyState(),
-                      ),
+                  ? CustomScrollView(
+                      slivers: [
+                        SliverFillRemaining(
+                          hasScrollBody: false,
+                          child: _buildEmptyState(),
+                        ),
+                      ],
                     )
                   : ListView.builder(
                       physics: const AlwaysScrollableScrollPhysics(),
@@ -345,13 +343,12 @@ class ScheduleScreen extends ConsumerWidget {
                   right: BorderSide(color: PhantomColors.border),
                 ),
               ),
-              child: SingleChildScrollView(
-                child: Padding(
-                  padding: const EdgeInsets.all(24),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
+              child: Padding(
+                padding: const EdgeInsets.all(24),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
                     // Handle
                     Center(
                       child: Container(
@@ -497,26 +494,17 @@ class ScheduleScreen extends ConsumerWidget {
                         child: Material(
                           color: Colors.transparent,
                           child: InkWell(
-                            onTap: () async {
+                            onTap: () {
                               if (selectedDays.isNotEmpty) {
-                                final success = await ref
+                                ref
                                     .read(scheduleProvider.notifier)
-                                    .addSchedule(InvisibleSchedule(
-                                      id: DateTime.now()
-                                          .millisecondsSinceEpoch
-                                          .toString(),
-                                      daysOfWeek: selectedDays.toList()..sort(),
-                                      startTime:
-                                          '${startTime.hour.toString().padLeft(2, '0')}:${startTime.minute.toString().padLeft(2, '0')}',
-                                      endTime:
-                                          '${endTime.hour.toString().padLeft(2, '0')}:${endTime.minute.toString().padLeft(2, '0')}',
-                                      label: labelController.text.isNotEmpty
-                                          ? labelController.text
-                                          : null,
-                                    ));
-                                if (success && context.mounted) {
-                                  Navigator.pop(context);
-                                }
+                                    .addSchedule(
+                                      '${startTime.hour.toString().padLeft(2, '0')}:${startTime.minute.toString().padLeft(2, '0')}',
+                                      '${endTime.hour.toString().padLeft(2, '0')}:${endTime.minute.toString().padLeft(2, '0')}',
+                                      selectedDays.toList()..sort(),
+                                      labelController.text.isNotEmpty ? labelController.text : 'Schedule',
+                                    );
+                                Navigator.pop(context);
                               }
                             },
                             borderRadius: BorderRadius.circular(14),
@@ -546,8 +534,7 @@ class ScheduleScreen extends ConsumerWidget {
                   ],
                 ),
               ),
-            ),
-          );
+            );
           },
         );
       },

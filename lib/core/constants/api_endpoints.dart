@@ -1,21 +1,24 @@
-
+import 'dart:io' show Platform;
 
 class ApiEndpoints {
   ApiEndpoints._();
   
-  // Base URL - Change this to your server URL
+  // Base URL - 10.0.2.2 is Android Emulator's alias to host localhost
   static String get baseUrl {
-    // if (Platform.isAndroid) {
-    //   return 'http://192.168.0.73:5000/api';
-    // }
-    // return 'http://localhost:5000/api';
-    return 'https://phantom-backend-eli0.onrender.com/api';
-  }
 
+    // ADB Reverse Port Forwarding is active!
+    // Connect directly to the host via localhost mapped port 5000
+    return 'http://127.0.0.1:5000/api';
+  }
+  
   // Auth
   static const String login = '/auth/login';
   static const String verifyOtp = '/auth/verify';
   static const String me = '/auth/me';
+  
+  // Settings
+  static const String toggleBlockUnknown = '/settings/block-unknown/toggle';
+  static const String syncContacts = '/settings/sync-contacts';
   
   // VIP Contacts
   static const String vipList = '/vip/list';

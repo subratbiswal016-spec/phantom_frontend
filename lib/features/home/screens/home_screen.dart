@@ -66,11 +66,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
         ),
         child: SafeArea(
           child: RefreshIndicator(
+            onRefresh: () => ref.read(invisibleProvider.notifier).loadStatus(),
             color: PhantomColors.primaryStart,
-            backgroundColor: PhantomColors.bgElevated,
-            onRefresh: () async {
-              await ref.read(invisibleProvider.notifier).refreshStats();
-            },
+            backgroundColor: PhantomColors.bgCardLight,
             child: CustomScrollView(
               physics: const AlwaysScrollableScrollPhysics(),
               slivers: [
@@ -78,211 +76,209 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                   hasScrollBody: false,
                   child: Column(
                     children: [
-              // Header
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-                child: Row(
-                  children: [
-                    Container(
-                      width: 40,
-                      height: 40,
-                      decoration: BoxDecoration(
-                        gradient: PhantomColors.primaryGradient,
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: const Icon(
-                        Icons.visibility_off_rounded,
-                        size: 20,
-                        color: Colors.white,
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Text(
-                      'PHANTOM',
-                      style: GoogleFonts.outfit(
-                        fontSize: 18,
-                        fontWeight: FontWeight.w700,
-                        color: PhantomColors.textPrimary,
-                        letterSpacing: 3,
-                      ),
-                    ),
-                    const Spacer(),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 12,
-                        vertical: 6,
-                      ),
-                      decoration: BoxDecoration(
-                        color: isInvisible
-                            ? PhantomColors.primaryStart.withValues(alpha: 0.15)
-                            : PhantomColors.accent.withValues(alpha: 0.15),
-                        borderRadius: BorderRadius.circular(20),
-                        border: Border.all(
-                          color: isInvisible
-                              ? PhantomColors.primaryStart.withValues(alpha: 0.3)
-                              : PhantomColors.accent.withValues(alpha: 0.3),
-                        ),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Container(
-                            width: 8,
-                            height: 8,
-                            decoration: BoxDecoration(
-                              shape: BoxShape.circle,
-                              color: isInvisible
-                                  ? PhantomColors.primaryStart
-                                  : PhantomColors.success,
-                            ),
-                          ),
-                          const SizedBox(width: 6),
-                          Text(
-                            isInvisible ? 'Invisible' : 'Visible',
-                            style: GoogleFonts.inter(
-                              fontSize: 12,
-                              fontWeight: FontWeight.w600,
-                              color: isInvisible
-                                  ? PhantomColors.primaryStart
-                                  : PhantomColors.success,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-
-              const Spacer(flex: 2),
-
-              // The Big Toggle
-              _buildToggleButton(isInvisible, state.isLoading),
-
-              const SizedBox(height: 24),
-
-              // Status text
-              AnimatedSwitcher(
-                duration: const Duration(milliseconds: 300),
-                child: Text(
-                  isInvisible
-                      ? 'You are Invisible'
-                      : 'You are Visible',
-                  key: ValueKey(isInvisible),
-                  style: GoogleFonts.outfit(
-                    fontSize: 28,
-                    fontWeight: FontWeight.w700,
-                    color: PhantomColors.textPrimary,
-                  ),
-                ),
-              ),
-
-              const SizedBox(height: 8),
-
-              AnimatedSwitcher(
-                duration: const Duration(milliseconds: 300),
-                child: Text(
-                  isInvisible
-                      ? 'All non-VIP calls will hear "switched off"'
-                      : 'Everyone can reach you right now',
-                  key: ValueKey('desc_$isInvisible'),
-                  style: GoogleFonts.inter(
-                    fontSize: 14,
-                    color: PhantomColors.textSecondary,
-                  ),
-                  textAlign: TextAlign.center,
-                ),
-              ),
-
-              const Spacer(flex: 1),
-
-              // Quick Stats
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 20),
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: PhantomStatCard(
-                        label: 'Blocked Today',
-                        value: '${state.blockedToday}',
-                        icon: Icons.block_rounded,
-                        iconColor: PhantomColors.danger,
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: PhantomStatCard(
-                        label: 'VIP Contacts',
-                        value: '${state.vipCount}',
-                        icon: Icons.star_rounded,
-                        iconColor: PhantomColors.warning,
-                      ),
-                    ),
-                  ],
-                ),
-              ).animate().fadeIn(delay: 300.ms, duration: 500.ms).slideY(
-                    begin: 0.2,
-                    end: 0,
-                    duration: 500.ms,
-                  ),
-
-              const SizedBox(height: 16),
-
-              // Recent blocked call teaser
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 20),
-                child: PhantomCard(
-                  onTap: () {},
-                  child: Row(
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.all(10),
-                        decoration: BoxDecoration(
-                          color: PhantomColors.danger.withValues(alpha: 0.15),
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: const Icon(
-                          Icons.phone_missed_rounded,
-                          color: PhantomColors.danger,
-                          size: 20,
-                        ),
-                      ),
-                      const SizedBox(width: 14),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
+                      // Header
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                        child: Row(
                           children: [
-                            Text(
-                              'Last blocked call',
-                              style: GoogleFonts.inter(
-                                fontSize: 13,
-                                color: PhantomColors.textSecondary,
+                            Container(
+                              width: 40,
+                              height: 40,
+                              decoration: BoxDecoration(
+                                gradient: PhantomColors.primaryGradient,
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: const Icon(
+                                Icons.visibility_off_rounded,
+                                size: 20,
+                                color: Colors.white,
                               ),
                             ),
-                            const SizedBox(height: 2),
+                            const SizedBox(width: 12),
                             Text(
-                              '+91 98765 43210 • 2 min ago',
-                              style: GoogleFonts.inter(
-                                fontSize: 14,
-                                fontWeight: FontWeight.w500,
+                              'PHANTOM',
+                              style: GoogleFonts.outfit(
+                                fontSize: 18,
+                                fontWeight: FontWeight.w700,
                                 color: PhantomColors.textPrimary,
+                                letterSpacing: 3,
                               ),
-                              overflow: TextOverflow.ellipsis,
-                              maxLines: 1,
+                            ),
+                            const Spacer(),
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 12,
+                                vertical: 6,
+                              ),
+                              decoration: BoxDecoration(
+                                color: isInvisible
+                                    ? PhantomColors.primaryStart.withValues(alpha: 0.15)
+                                    : PhantomColors.accent.withValues(alpha: 0.15),
+                                borderRadius: BorderRadius.circular(20),
+                                border: Border.all(
+                                  color: isInvisible
+                                      ? PhantomColors.primaryStart.withValues(alpha: 0.3)
+                                      : PhantomColors.accent.withValues(alpha: 0.3),
+                                ),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Container(
+                                    width: 8,
+                                    height: 8,
+                                    decoration: BoxDecoration(
+                                      shape: BoxShape.circle,
+                                      color: isInvisible
+                                          ? PhantomColors.primaryStart
+                                          : PhantomColors.success,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 6),
+                                  Text(
+                                    isInvisible ? 'Invisible' : 'Visible',
+                                    style: GoogleFonts.inter(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w600,
+                                      color: isInvisible
+                                          ? PhantomColors.primaryStart
+                                          : PhantomColors.success,
+                                    ),
+                                  ),
+                                ],
+                              ),
                             ),
                           ],
                         ),
                       ),
-                      const Icon(
-                        Icons.chevron_right_rounded,
-                        color: PhantomColors.textTertiary,
-                      ),
-                    ],
-                  ),
-                ),
-              ).animate().fadeIn(delay: 500.ms, duration: 500.ms),
 
-              const SizedBox(height: 20),
+                      const Spacer(flex: 2),
+
+                      // The Big Toggle
+                      _buildToggleButton(isInvisible, state.isLoading),
+
+                      const SizedBox(height: 24),
+
+                      // Status text
+                      AnimatedSwitcher(
+                        duration: const Duration(milliseconds: 300),
+                        child: Text(
+                          isInvisible
+                              ? 'You are Invisible'
+                              : 'You are Visible',
+                          key: ValueKey(isInvisible),
+                          style: GoogleFonts.outfit(
+                            fontSize: 28,
+                            fontWeight: FontWeight.w700,
+                            color: PhantomColors.textPrimary,
+                          ),
+                        ),
+                      ),
+
+                      const SizedBox(height: 8),
+
+                      AnimatedSwitcher(
+                        duration: const Duration(milliseconds: 300),
+                        child: Text(
+                          isInvisible
+                              ? 'All non-VIP calls will hear "switched off"'
+                              : 'Everyone can reach you right now',
+                          key: ValueKey('desc_$isInvisible'),
+                          style: GoogleFonts.inter(
+                            fontSize: 14,
+                            color: PhantomColors.textSecondary,
+                          ),
+                          textAlign: TextAlign.center,
+                        ),
+                      ),
+
+                      const Spacer(flex: 1),
+
+                      // Quick Stats
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 20),
+                        child: Row(
+                          children: [
+                            Expanded(
+                              child: PhantomStatCard(
+                                label: 'Blocked Today',
+                                value: '${state.blockedToday}',
+                                icon: Icons.block_rounded,
+                                iconColor: PhantomColors.danger,
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: PhantomStatCard(
+                                label: 'VIP Contacts',
+                                value: '${state.vipCount}',
+                                icon: Icons.star_rounded,
+                                iconColor: PhantomColors.warning,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ).animate().fadeIn(delay: 300.ms, duration: 500.ms).slideY(
+                            begin: 0.2,
+                            end: 0,
+                            duration: 500.ms,
+                          ),
+
+                      const SizedBox(height: 16),
+
+                      // Recent blocked call teaser
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 20),
+                        child: PhantomCard(
+                          onTap: () {},
+                          child: Row(
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.all(10),
+                                decoration: BoxDecoration(
+                                  color: PhantomColors.danger.withValues(alpha: 0.15),
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                child: const Icon(
+                                  Icons.phone_missed_rounded,
+                                  color: PhantomColors.danger,
+                                  size: 20,
+                                ),
+                              ),
+                              const SizedBox(width: 14),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      'Last blocked call',
+                                      style: GoogleFonts.inter(
+                                        fontSize: 13,
+                                        color: PhantomColors.textSecondary,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 2),
+                                    Text(
+                                      '+91 98765 43210 • 2 min ago',
+                                      style: GoogleFonts.inter(
+                                        fontSize: 14,
+                                        fontWeight: FontWeight.w500,
+                                        color: PhantomColors.textPrimary,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              const Icon(
+                                Icons.chevron_right_rounded,
+                                color: PhantomColors.textTertiary,
+                              ),
+                            ],
+                          ),
+                        ),
+                      ).animate().fadeIn(delay: 500.ms, duration: 500.ms),
+
+                      const SizedBox(height: 20),
                     ],
                   ),
                 ),

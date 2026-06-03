@@ -58,19 +58,17 @@ class CallLogScreen extends ConsumerWidget {
           // Call log list
           Expanded(
             child: RefreshIndicator(
+              onRefresh: () => ref.read(callLogProvider.notifier).loadLogs(),
               color: PhantomColors.primaryStart,
-              backgroundColor: PhantomColors.bgElevated,
-              onRefresh: () async {
-                await ref.read(callLogProvider.notifier).fetchList();
-              },
+              backgroundColor: PhantomColors.bgCardLight,
               child: callLogs.isEmpty
-                  ? SingleChildScrollView(
-                      physics: const AlwaysScrollableScrollPhysics(),
-                      child: Container(
-                        height: MediaQuery.of(context).size.height * 0.6,
-                        alignment: Alignment.center,
-                        child: _buildEmptyState(),
-                      ),
+                  ? CustomScrollView(
+                      slivers: [
+                        SliverFillRemaining(
+                          hasScrollBody: false,
+                          child: _buildEmptyState(),
+                        ),
+                      ],
                     )
                   : ListView.builder(
                       physics: const AlwaysScrollableScrollPhysics(),
@@ -155,8 +153,6 @@ class CallLogScreen extends ConsumerWidget {
                           fontWeight: FontWeight.w600,
                           color: PhantomColors.textPrimary,
                         ),
-                        overflow: TextOverflow.ellipsis,
-                        maxLines: 1,
                       ),
                     ),
                     Container(
@@ -187,8 +183,6 @@ class CallLogScreen extends ConsumerWidget {
                 const SizedBox(height: 4),
                 Wrap(
                   crossAxisAlignment: WrapCrossAlignment.center,
-                  spacing: 8,
-                  runSpacing: 4,
                   children: [
                     Text(
                       entry.callerPhone,
@@ -197,12 +191,14 @@ class CallLogScreen extends ConsumerWidget {
                         color: PhantomColors.textSecondary,
                       ),
                     ),
+                    const SizedBox(width: 8),
                     Text(
                       '•',
                       style: GoogleFonts.inter(
                         color: PhantomColors.textTertiary,
                       ),
                     ),
+                    const SizedBox(width: 8),
                     Text(
                       timeStr,
                       style: GoogleFonts.inter(
@@ -211,12 +207,14 @@ class CallLogScreen extends ConsumerWidget {
                       ),
                     ),
                     if (entry.duration != null) ...[
+                      const SizedBox(width: 8),
                       Text(
                         '•',
                         style: GoogleFonts.inter(
                           color: PhantomColors.textTertiary,
                         ),
                       ),
+                      const SizedBox(width: 8),
                       Text(
                         _formatDuration(entry.duration!),
                         style: GoogleFonts.inter(

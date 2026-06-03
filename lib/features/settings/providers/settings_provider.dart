@@ -1,45 +1,39 @@
-import 'dart:convert';
-import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_contacts/flutter_contacts.dart';
 import 'package:permission_handler/permission_handler.dart';
-import 'package:shared_preferences/shared_preferences.dart';
-
 import '../../../core/network/api_client.dart';
 import '../../../core/constants/api_endpoints.dart';
-import '../../vip_list/providers/vip_provider.dart';
+import '../../../core/services/notification_service.dart';
+import '../../../core/services/call_blocking_service.dart';
 
 class SettingsState {
   final bool blockUnknown;
   final bool isSyncing;
-  final String subscriptionTier;
   final bool pushNotifications;
   final bool blockedCallAlerts;
-  final bool blockDirectCalls;
+  final String customMessage;
 
   const SettingsState({
     this.blockUnknown = false,
     this.isSyncing = false,
-    this.subscriptionTier = 'free',
     this.pushNotifications = true,
     this.blockedCallAlerts = false,
-    this.blockDirectCalls = false,
+    this.customMessage = 'The number you are trying to reach is currently switched off.',
   });
 
   SettingsState copyWith({
     bool? blockUnknown,
     bool? isSyncing,
-    String? subscriptionTier,
     bool? pushNotifications,
     bool? blockedCallAlerts,
-    bool? blockDirectCalls,
+    String? customMessage,
   }) {
     return SettingsState(
       blockUnknown: blockUnknown ?? this.blockUnknown,
       isSyncing: isSyncing ?? this.isSyncing,
-      subscriptionTier: subscriptionTier ?? this.subscriptionTier,
       pushNotifications: pushNotifications ?? this.pushNotifications,
       blockedCallAlerts: blockedCallAlerts ?? this.blockedCallAlerts,
-      blockDirectCalls: blockDirectCalls ?? this.blockDirectCalls,
+      customMessage: customMessage ?? this.customMessage,
     );
   }
 }
@@ -51,7 +45,6 @@ final settingsProvider =
 
 class SettingsNotifier extends StateNotifier<SettingsState> {
   final Ref ref;
-  static const _platform = MethodChannel('com.phantom.app/call_blocker');
 
   SettingsNotifier(this.ref) : super(const SettingsState()) {
     loadSettings();
@@ -59,33 +52,13 @@ class SettingsNotifier extends StateNotifier<SettingsState> {
 
   Future<void> loadSettings() async {
     try {
-      final prefs = await SharedPreferences.getInstance();
-      final localBlockDirect = prefs.getBool('blockDirectCalls') ?? false;
-      
       final dio = ref.read(dioProvider);
       final response = await dio.get(ApiEndpoints.me);
-      final data = response.data['data'];
-      
-      bool currentInvisible = false;
-      if (data != null) {
-        currentInvisible = data['isInvisible'] ?? false;
-      }
-      
-      // Save state variables to SharedPreferences for Android CallBlockerService access
-      await prefs.setBool('isInvisible', currentInvisible);
-      
-      // Sync VIP numbers list to SharedPreferences for native access
-      final vipContacts = ref.read(vipListProvider);
-      final vipPhones = vipContacts.map((c) => c.phone).toList();
-      await prefs.setString('vipListCached', jsonEncode(vipPhones));
-
-      if (data != null && mounted) {
+      final user = response.data['data']; // The /auth/me payload is usually nested in 'data'
+      if (user != null && mounted) {
         state = state.copyWith(
-          blockUnknown: data['blockUnknown'] ?? false,
-          subscriptionTier: data['plan'] ?? 'free',
-          pushNotifications: data['pushNotifications'] ?? true,
-          blockedCallAlerts: data['blockedCallAlerts'] ?? false,
-          blockDirectCalls: localBlockDirect,
+          blockUnknown: user['blockUnknown'] ?? false,
+          customMessage: user['customMessage'] ?? state.customMessage,
         );
       }
     } catch (e) {
@@ -93,100 +66,102 @@ class SettingsNotifier extends StateNotifier<SettingsState> {
     }
   }
 
-  Future<void> togglePushNotifications() async {
-    final newValue = !state.pushNotifications;
-    state = state.copyWith(pushNotifications: newValue);
-    try {
-      final dio = ref.read(dioProvider);
-      await dio.post('/settings/notifications/push/toggle');
-    } catch (e) {
-      print('Failed to toggle push notifications: $e');
-      state = state.copyWith(pushNotifications: !newValue);
+  Future<void> togglePushNotifications(bool value) async {
+    state = state.copyWith(pushNotifications: value);
+    if (value) {
+      await NotificationService().requestPermission();
+      await NotificationService().showNotification(
+        title: 'Push Notifications Enabled',
+        body: 'You will now receive alerts for VIP calls.',
+      );
     }
   }
 
-  Future<void> toggleBlockedCallAlerts() async {
-    final newValue = !state.blockedCallAlerts;
-    state = state.copyWith(blockedCallAlerts: newValue);
+  Future<void> toggleBlockedCallAlerts(bool value) async {
+    state = state.copyWith(blockedCallAlerts: value);
+    if (value) {
+      await NotificationService().requestPermission();
+      await NotificationService().showNotification(
+        title: 'Blocked Call Alerts Enabled',
+        body: 'You will receive silent notifications when an unknown caller is blocked.',
+      );
+    }
+  }
+
+  Future<void> updateCustomMessage(String message) async {
     try {
       final dio = ref.read(dioProvider);
-      await dio.post('/settings/notifications/alerts/toggle');
+      await dio.post(ApiEndpoints.updateCustomMessage, data: {'message': message});
+      state = state.copyWith(customMessage: message);
     } catch (e) {
-      print('Failed to toggle blocked call alerts: $e');
-      state = state.copyWith(blockedCallAlerts: !newValue);
+      print('Failed to update custom message: $e');
     }
   }
 
   Future<void> toggleBlockUnknown() async {
-    final newValue = !state.blockUnknown;
-    // If turning on, request contacts permission
-    if (newValue) {
+    // If turning on, we need contacts permission to sync them to the backend
+    if (!state.blockUnknown) {
       final status = await Permission.contacts.request();
-      if (!status.isGranted) {
+      if (status.isGranted) {
+        
+        // Request the native call screening role!
+        final roleGranted = await CallBlockingService.requestCallScreeningRole();
+        if (!roleGranted) {
+          print('Call screening role denied. Cannot enable feature natively.');
+          // We can choose to fail here or just allow backend blocking (if backend blocking existed).
+          // We will proceed for the sake of the backend sync, but native won't block.
+        }
+
+        state = state.copyWith(isSyncing: true, blockUnknown: true);
+        
+        try {
+          // Tell native Android layer to block unknown callers
+          await CallBlockingService.setBlockUnknown(true);
+
+          // 1. Fetch contacts from phone
+          final contacts = await FlutterContacts.getContacts(
+            withProperties: true,
+          );
+          
+          // 2. Extract phone numbers
+          final phoneNumbers = <String>[];
+          for (final contact in contacts) {
+            for (final phone in contact.phones) {
+              phoneNumbers.add(phone.number);
+            }
+          }
+          
+          // 3. Send to backend
+          final dio = ref.read(dioProvider);
+          await dio.post(ApiEndpoints.syncContacts, data: {'contacts': phoneNumbers});
+          print('Synced ${phoneNumbers.length} contacts to backend for Unknown Numbers block.');
+          
+          // 4. Toggle on backend
+          await dio.post(ApiEndpoints.toggleBlockUnknown, data: {'block_unknown': true});
+          
+        } catch (e) {
+          print('Error syncing contacts: $e');
+          state = state.copyWith(blockUnknown: false); // Revert on failure
+          await CallBlockingService.setBlockUnknown(false); // Revert natively
+        } finally {
+          if (mounted) state = state.copyWith(isSyncing: false);
+        }
+      } else {
+        // Permission denied, cannot enable feature
         print('Contacts permission denied');
         return;
       }
-    }
-
-    // Optimistic update
-    state = state.copyWith(blockUnknown: newValue);
-
-    try {
-      final dio = ref.read(dioProvider);
-      await dio.post('/settings/block-unknown/toggle', data: {
-        'blockUnknown': newValue,
-      });
-    } catch (e) {
-      print('Failed to update block unknown: $e');
-      // Revert on failure
-      state = state.copyWith(blockUnknown: !newValue);
-    }
-  }
-
-  Future<void> toggleBlockDirectCalls() async {
-    final newValue = !state.blockDirectCalls;
-    
-    if (newValue) {
-      // 1. Request Telecom/Phone Permissions
-      final phoneStatus = await Permission.phone.request();
-      if (!phoneStatus.isGranted) {
-        print('Phone permission denied');
-        return;
-      }
-      
-      // 2. Request Android Call Screening Role
+    } else {
+      // Turning off
       try {
-        final bool roleGranted = await _platform.invokeMethod<bool>('requestCallScreeningRole') ?? false;
-        if (!roleGranted) {
-          print('Call screening role denied');
-          return;
-        }
-      } on PlatformException catch (e) {
-        print('Failed to request role: ${e.message}');
-        return;
+        await CallBlockingService.setBlockUnknown(false); // Update native layer
+        
+        final dio = ref.read(dioProvider);
+        await dio.post(ApiEndpoints.toggleBlockUnknown, data: {'block_unknown': false});
+        state = state.copyWith(blockUnknown: false);
+      } catch (e) {
+        print('Failed to toggle block unknown: $e');
       }
-    }
-
-    // Save to SharedPreferences
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setBool('blockDirectCalls', newValue);
-    
-    state = state.copyWith(blockDirectCalls: newValue);
-  }
-
-  Future<void> upgradeSubscription(String tier) async {
-    try {
-      final dio = ref.read(dioProvider);
-      // Wait, we need to call /api/subscription/upgrade which I just made
-      final response = await dio.post('/subscription/upgrade', data: {
-        'plan': tier.toLowerCase(),
-      });
-      if (response.data['success'] == true) {
-        state = state.copyWith(subscriptionTier: tier.toLowerCase());
-      }
-    } catch (e) {
-      print('Failed to upgrade subscription: $e');
-      rethrow;
     }
   }
 }

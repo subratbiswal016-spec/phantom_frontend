@@ -1,6 +1,8 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+
 import '../../../core/network/api_client.dart';
 import '../../../core/constants/api_endpoints.dart';
+import '../../../core/services/call_blocking_service.dart';
 
 /// Invisible mode state
 final invisibleProvider = StateNotifierProvider<InvisibleNotifier, InvisibleState>((ref) {
@@ -39,33 +41,22 @@ class InvisibleNotifier extends StateNotifier<InvisibleState> {
   final Ref ref;
 
   InvisibleNotifier(this.ref) : super(const InvisibleState()) {
-    refreshStats();
+    loadStatus();
   }
 
-  Future<void> refreshStats() async {
+  Future<void> loadStatus() async {
     try {
       final dio = ref.read(dioProvider);
-      
-      // Fetch status, stats and VIP list in parallel
-      final results = await Future.wait([
-        dio.get(ApiEndpoints.invisibleStatus),
-        dio.get(ApiEndpoints.callStats),
-        dio.get(ApiEndpoints.vipList),
-      ]);
-
-      final statusData = results[0].data['data'];
-      final statsData = results[1].data['data'];
-      final vipData = results[2].data['data'];
-
-      if (mounted) {
+      final response = await dio.get(ApiEndpoints.invisibleStatus);
+      final data = response.data['data'];
+      if (data != null && mounted) {
         state = state.copyWith(
-          isInvisible: statusData['isInvisible'] ?? false,
-          blockedToday: statsData['blockedToday'] ?? 0,
-          vipCount: vipData != null ? (vipData as List).length : 0,
+          isInvisible: data['isInvisible'] ?? false,
+          // Let's assume stats aren't currently returned by this endpoint, we will fetch stats in call log
         );
       }
     } catch (e) {
-      print('Failed to refresh home stats: $e');
+      print('Failed to load status: $e');
     }
   }
 
@@ -75,16 +66,19 @@ class InvisibleNotifier extends StateNotifier<InvisibleState> {
       final dio = ref.read(dioProvider);
       final response = await dio.post(ApiEndpoints.invisibleToggle);
       final data = response.data['data'];
-      if (mounted && data != null) {
+      if (data != null && mounted) {
+        final newInvisibleState = data['isInvisible'] ?? false;
+        
+        // Sync with Native Android Call Blocker
+        await CallBlockingService.setInvisibleMode(newInvisibleState);
+
         state = state.copyWith(
-          isInvisible: data['isInvisible'] ?? !state.isInvisible,
+          isInvisible: newInvisibleState,
           isLoading: false,
         );
-        // Refresh call stats in background
-        refreshStats();
       }
     } catch (e) {
-      print('Failed to toggle invisible mode: $e');
+      print('Failed to toggle status: $e');
       if (mounted) {
         state = state.copyWith(isLoading: false);
       }

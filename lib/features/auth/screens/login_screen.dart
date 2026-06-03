@@ -3,10 +3,13 @@ import 'package:flutter/services.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:go_router/go_router.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../providers/auth_provider.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/phantom_button.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:dio/dio.dart';
+import '../../../core/constants/api_endpoints.dart';
+import '../../../core/network/api_client.dart';
 
 class LoginScreen extends ConsumerStatefulWidget {
   const LoginScreen({super.key});
@@ -18,7 +21,6 @@ class LoginScreen extends ConsumerStatefulWidget {
 class _LoginScreenState extends ConsumerState<LoginScreen> {
   final _phoneController = TextEditingController();
   final _otpController = TextEditingController();
-  final _nameController = TextEditingController();
   bool _otpSent = false;
   bool _isLoading = false;
 
@@ -26,56 +28,50 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   void dispose() {
     _phoneController.dispose();
     _otpController.dispose();
-    _nameController.dispose();
     super.dispose();
   }
 
   Future<void> _sendOtp() async {
-    final phone = _phoneController.text.trim();
-    if (phone.length < 10) return;
-    
-    // Normalize format to start with +
-    String formattedPhone = phone;
-    if (!formattedPhone.startsWith('+')) {
-      formattedPhone = '+$formattedPhone';
-    }
-
+    if (_phoneController.text.length < 10) return;
     setState(() => _isLoading = true);
-    final success = await ref.read(authProvider.notifier).sendOtp(formattedPhone);
-    setState(() => _isLoading = false);
     
-    if (success) {
+    try {
+      final dio = ref.read(dioProvider);
+      await dio.post(ApiEndpoints.login, data: {'phone': '+91${_phoneController.text}'});
       setState(() {
         _otpSent = true;
       });
-    } else {
-      final error = ref.read(authProvider).error ?? 'Failed to send OTP';
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(error), backgroundColor: PhantomColors.danger),
-      );
+    } catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Failed to send OTP')));
+    } finally {
+      setState(() => _isLoading = false);
     }
   }
 
   Future<void> _verifyOtp() async {
-    final otp = _otpController.text.trim();
-    if (otp.length < 6) return;
-
+    if (_otpController.text.length < 6) return;
     setState(() => _isLoading = true);
-    final success = await ref.read(authProvider.notifier).verifyOtp(
-          otp,
-          name: _nameController.text.trim().isNotEmpty ? _nameController.text.trim() : null,
-        );
-    setState(() => _isLoading = false);
-
-    if (success) {
-      if (mounted) {
-        context.go('/home');
+    
+    try {
+      final dio = ref.read(dioProvider);
+      final response = await dio.post(ApiEndpoints.verifyOtp, data: {
+        'phone': '+91${_phoneController.text}',
+        'otp': _otpController.text
+      });
+      
+      final token = response.data['data']['token'];
+      if (token != null) {
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setString('auth_token', token);
+        if (mounted) context.go('/home');
       }
-    } else {
-      final error = ref.read(authProvider).error ?? 'Invalid OTP';
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(error), backgroundColor: PhantomColors.danger),
-      );
+    } on DioException catch (e) {
+      final msg = e.response?.data['message'] ?? 'Invalid OTP';
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
+    } catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Error verifying OTP')));
+    } finally {
+      setState(() => _isLoading = false);
     }
   }
 
@@ -120,12 +116,10 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                         ),
                       ],
                     ),
-                    child: ClipRRect(
-                      borderRadius: BorderRadius.circular(20),
-                      child: Image.asset(
-                        'assets/images/logo.png',
-                        fit: BoxFit.cover,
-                      ),
+                    child: const Icon(
+                      Icons.visibility_off_rounded,
+                      size: 36,
+                      color: Colors.white,
                     ),
                   ),
                 ).animate().fadeIn(duration: 400.ms).scale(
