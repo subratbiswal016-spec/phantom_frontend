@@ -25,8 +25,8 @@ class CallLogEntry {
   factory CallLogEntry.fromJson(Map<String, dynamic> json) {
     return CallLogEntry(
       id: json['id']?.toString() ?? '',
-      callerName: json['caller_name'] ?? 'Unknown',
-      callerPhone: json['caller_phone'] ?? '',
+      callerName: json['callerName'] ?? json['caller_name'] ?? 'Unknown',
+      callerPhone: json['callerPhone'] ?? json['caller_phone'] ?? '',
       status: json['status'] ?? 'blocked',
       timestamp: json['timestamp'] != null ? DateTime.parse(json['timestamp']) : DateTime.now(),
       duration: json['duration'],
