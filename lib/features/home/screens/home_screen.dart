@@ -6,6 +6,7 @@ import 'package:google_fonts/google_fonts.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/phantom_card.dart';
 import '../providers/home_provider.dart';
+import '../../call_log/providers/call_log_provider.dart';
 
 class HomeScreen extends ConsumerStatefulWidget {
   const HomeScreen({super.key});
@@ -39,10 +40,21 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
     super.dispose();
   }
 
+  String _formatTimeAgo(DateTime time) {
+    final diff = DateTime.now().difference(time);
+    if (diff.inSeconds < 5) return 'Just now';
+    if (diff.inSeconds < 60) return '${diff.inSeconds}s ago';
+    if (diff.inMinutes < 60) return '${diff.inMinutes} min ago';
+    if (diff.inHours < 24) return '${diff.inHours} hr ago';
+    return '${diff.inDays} days ago';
+  }
+
   @override
   Widget build(BuildContext context) {
     final state = ref.watch(invisibleProvider);
     final isInvisible = state.isInvisible;
+    final callLogs = ref.watch(callLogProvider);
+    final lastBlockedCall = callLogs.where((log) => log.status == 'blocked').firstOrNull;
 
     return Scaffold(
       backgroundColor: PhantomColors.bgDark,
@@ -66,7 +78,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
         ),
         child: SafeArea(
           child: RefreshIndicator(
-            onRefresh: () => ref.read(invisibleProvider.notifier).loadStatus(),
+            onRefresh: () async {
+              await ref.read(invisibleProvider.notifier).loadStatus();
+              await ref.read(callLogProvider.notifier).loadLogs();
+            },
             color: PhantomColors.primaryStart,
             backgroundColor: PhantomColors.bgCardLight,
             child: CustomScrollView(
@@ -259,7 +274,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                                     ),
                                     const SizedBox(height: 2),
                                     Text(
-                                      '+91 98765 43210 • 2 min ago',
+                                      lastBlockedCall != null
+                                          ? '${lastBlockedCall.callerName != 'Unknown' ? lastBlockedCall.callerName : lastBlockedCall.callerPhone} • ${_formatTimeAgo(lastBlockedCall.timestamp)}'
+                                          : 'No blocked calls yet',
                                       style: GoogleFonts.inter(
                                         fontSize: 14,
                                         fontWeight: FontWeight.w500,

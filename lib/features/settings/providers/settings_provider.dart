@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_contacts/flutter_contacts.dart';
 import 'package:permission_handler/permission_handler.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../../../core/network/api_client.dart';
 import '../../../core/constants/api_endpoints.dart';
 import '../../../core/services/notification_service.dart';
@@ -12,6 +13,9 @@ class SettingsState {
   final bool pushNotifications;
   final bool blockedCallAlerts;
   final String customMessage;
+  final String plan;
+  final String name;
+  final String phone;
 
   const SettingsState({
     this.blockUnknown = false,
@@ -19,6 +23,9 @@ class SettingsState {
     this.pushNotifications = true,
     this.blockedCallAlerts = false,
     this.customMessage = 'The number you are trying to reach is currently switched off.',
+    this.plan = 'free',
+    this.name = '',
+    this.phone = '',
   });
 
   SettingsState copyWith({
@@ -27,6 +34,9 @@ class SettingsState {
     bool? pushNotifications,
     bool? blockedCallAlerts,
     String? customMessage,
+    String? plan,
+    String? name,
+    String? phone,
   }) {
     return SettingsState(
       blockUnknown: blockUnknown ?? this.blockUnknown,
@@ -34,6 +44,9 @@ class SettingsState {
       pushNotifications: pushNotifications ?? this.pushNotifications,
       blockedCallAlerts: blockedCallAlerts ?? this.blockedCallAlerts,
       customMessage: customMessage ?? this.customMessage,
+      plan: plan ?? this.plan,
+      name: name ?? this.name,
+      phone: phone ?? this.phone,
     );
   }
 }
@@ -56,10 +69,18 @@ class SettingsNotifier extends StateNotifier<SettingsState> {
       final response = await dio.get(ApiEndpoints.me);
       final user = response.data['data']; // The /auth/me payload is usually nested in 'data'
       if (user != null && mounted) {
+        final plan = user['plan'] ?? 'free';
         state = state.copyWith(
           blockUnknown: user['blockUnknown'] ?? false,
           customMessage: user['customMessage'] ?? state.customMessage,
+          plan: plan,
+          name: user['name'] ?? '',
+          phone: user['phone'] ?? '',
         );
+
+        // Save plan to SharedPreferences so native Kotlin service can access it
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setString('plan', plan);
       }
     } catch (e) {
       print('Failed to load settings: $e');
@@ -162,6 +183,25 @@ class SettingsNotifier extends StateNotifier<SettingsState> {
       } catch (e) {
         print('Failed to toggle block unknown: $e');
       }
+    }
+  }
+
+  Future<void> upgradeSubscription(String plan) async {
+    try {
+      final dio = ref.read(dioProvider);
+      final response = await dio.post(ApiEndpoints.subscriptionUpgrade, data: {'plan': plan});
+      final data = response.data['data'];
+      if (data != null && mounted) {
+        final newPlan = data['plan'] ?? plan;
+        state = state.copyWith(plan: newPlan);
+
+        // Sync with SharedPreferences for native Android checker
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setString('plan', newPlan);
+      }
+    } catch (e) {
+      print('Failed to upgrade subscription: $e');
+      rethrow;
     }
   }
 }

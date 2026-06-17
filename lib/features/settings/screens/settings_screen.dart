@@ -14,6 +14,8 @@ class SettingsScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final settingsState = ref.watch(settingsProvider);
+
     return Scaffold(
       backgroundColor: PhantomColors.bgDark,
       appBar: const PhantomAppBar(title: 'Settings'),
@@ -52,7 +54,7 @@ class SettingsScreen extends ConsumerWidget {
                     ),
                     child: Center(
                       child: Text(
-                        'S',
+                        settingsState.name.isNotEmpty ? settingsState.name[0].toUpperCase() : 'U',
                         style: GoogleFonts.outfit(
                           fontSize: 24,
                           fontWeight: FontWeight.w700,
@@ -67,7 +69,7 @@ class SettingsScreen extends ConsumerWidget {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          'Subrat Biswal',
+                          settingsState.name.isNotEmpty ? settingsState.name : 'Unknown User',
                           style: GoogleFonts.outfit(
                             fontSize: 18,
                             fontWeight: FontWeight.w600,
@@ -76,7 +78,7 @@ class SettingsScreen extends ConsumerWidget {
                         ),
                         const SizedBox(height: 2),
                         Text(
-                          '+91 98765 43210',
+                          settingsState.phone.isNotEmpty ? settingsState.phone : 'No Phone Linked',
                           style: GoogleFonts.inter(
                             fontSize: 13,
                             color: PhantomColors.textSecondary,
@@ -95,7 +97,7 @@ class SettingsScreen extends ConsumerWidget {
                       borderRadius: BorderRadius.circular(8),
                     ),
                     child: Text(
-                      'PRO',
+                      settingsState.plan.toUpperCase(),
                       style: GoogleFonts.outfit(
                         fontSize: 11,
                         fontWeight: FontWeight.w800,
@@ -110,13 +112,6 @@ class SettingsScreen extends ConsumerWidget {
 
             const SizedBox(height: 24),
 
-            // Subscription section
-            _buildSectionTitle('Subscription'),
-            const SizedBox(height: 8),
-            _buildSubscriptionCard(context),
-
-            const SizedBox(height: 24),
-
             Consumer(
               builder: (context, ref, child) {
                 final settingsState = ref.watch(settingsProvider);
@@ -124,6 +119,12 @@ class SettingsScreen extends ConsumerWidget {
                 return Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
+                    // Subscription section
+                    _buildSectionTitle('Subscription'),
+                    const SizedBox(height: 8),
+                    _buildSubscriptionCard(context, ref, settingsState.plan),
+                    const SizedBox(height: 24),
+
                     // Settings sections
                     _buildSectionTitle('Invisible Mode'),
                     const SizedBox(height: 8),
@@ -386,7 +387,9 @@ class SettingsScreen extends ConsumerWidget {
     );
   }
 
-  Widget _buildSubscriptionCard(BuildContext context) {
+  Widget _buildSubscriptionCard(BuildContext context, WidgetRef ref, String currentPlan) {
+    final lowerCurrentPlan = currentPlan.toLowerCase();
+    
     return PhantomCard(
       padding: const EdgeInsets.all(0),
       child: Column(
@@ -396,13 +399,37 @@ class SettingsScreen extends ConsumerWidget {
             padding: const EdgeInsets.all(16),
             child: Column(
               children: [
-                _buildPlanRow('Free', '₹0/mo', '3 VIPs', false),
+                _buildPlanRow(
+                  'Free', 
+                  '₹0/mo', 
+                  '1 VIP • 20 Blocked Calls', 
+                  lowerCurrentPlan == 'free',
+                  () => _confirmUpgrade(context, ref, 'free'),
+                ),
                 const Divider(color: PhantomColors.border, height: 1),
-                _buildPlanRow('Basic', '₹${AppConstants.basicPrice}/mo', '10 VIPs + Schedule', false),
+                _buildPlanRow(
+                  'Basic', 
+                  '₹${AppConstants.basicPrice}/mo', 
+                  '10 VIPs • 100 Blocked Calls', 
+                  lowerCurrentPlan == 'basic',
+                  () => _confirmUpgrade(context, ref, 'basic'),
+                ),
                 const Divider(color: PhantomColors.border, height: 1),
-                _buildPlanRow('Pro', '₹${AppConstants.proPrice}/mo', 'Unlimited + Custom Msg', true),
+                _buildPlanRow(
+                  'Pro', 
+                  '₹${AppConstants.proPrice}/mo', 
+                  'Unlimited VIPs • Unlimited Blocks', 
+                  lowerCurrentPlan == 'pro',
+                  () => _confirmUpgrade(context, ref, 'pro'),
+                ),
                 const Divider(color: PhantomColors.border, height: 1),
-                _buildPlanRow('Business', '₹${AppConstants.businessPrice}/mo', 'Team Accounts', false),
+                _buildPlanRow(
+                  'Business', 
+                  '₹${AppConstants.businessPrice}/mo', 
+                  'Team Accounts • Priority Support', 
+                  lowerCurrentPlan == 'business',
+                  () => _confirmUpgrade(context, ref, 'business'),
+                ),
               ],
             ),
           ),
@@ -411,80 +438,381 @@ class SettingsScreen extends ConsumerWidget {
     );
   }
 
-  Widget _buildPlanRow(String name, String price, String feature, bool isCurrent) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 12),
-      child: Row(
-        children: [
-          Container(
-            width: 8,
-            height: 8,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              color: isCurrent
-                  ? PhantomColors.primaryStart
-                  : PhantomColors.textTertiary,
-            ),
+  void _confirmUpgrade(BuildContext context, WidgetRef ref, String planName) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: PhantomColors.bgCard,
+        title: Text(
+          'Change Plan',
+          style: GoogleFonts.outfit(color: PhantomColors.textPrimary, fontWeight: FontWeight.bold),
+        ),
+        content: Text(
+          'Do you want to switch your plan to ${planName.toUpperCase()}?',
+          style: GoogleFonts.inter(color: PhantomColors.textSecondary),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text('Cancel', style: GoogleFonts.inter(color: PhantomColors.textTertiary)),
           ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Text(
-                      name,
-                      style: GoogleFonts.outfit(
-                        fontSize: 15,
-                        fontWeight: FontWeight.w600,
-                        color: isCurrent
-                            ? PhantomColors.primaryStart
-                            : PhantomColors.textPrimary,
-                      ),
-                    ),
-                    if (isCurrent) ...[
-                      const SizedBox(width: 8),
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 6,
-                          vertical: 2,
-                        ),
-                        decoration: BoxDecoration(
-                          color: PhantomColors.primaryStart.withValues(alpha: 0.15),
-                          borderRadius: BorderRadius.circular(4),
-                        ),
-                        child: Text(
-                          'CURRENT',
-                          style: GoogleFonts.inter(
-                            fontSize: 9,
-                            fontWeight: FontWeight.w700,
-                            color: PhantomColors.primaryStart,
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: PhantomColors.primaryStart,
+            ),
+            onPressed: () async {
+              Navigator.pop(context);
+              _showPaymentSheet(context, ref, planName);
+            },
+            child: Text('Confirm', style: GoogleFonts.inter(color: Colors.white, fontWeight: FontWeight.bold)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showPaymentSheet(BuildContext context, WidgetRef ref, String planName) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) {
+        bool isProcessing = false;
+        bool isRequestSent = false;
+        final upiController = TextEditingController();
+        String? paymentError;
+
+        return StatefulBuilder(
+          builder: (context, setSheetState) {
+            return Container(
+              padding: EdgeInsets.only(
+                bottom: MediaQuery.of(context).viewInsets.bottom,
+              ),
+              decoration: const BoxDecoration(
+                color: PhantomColors.bgCard,
+                borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+                border: Border(
+                  top: BorderSide(color: PhantomColors.border),
+                  left: BorderSide(color: PhantomColors.border),
+                  right: BorderSide(color: PhantomColors.border),
+                ),
+              ),
+              child: SingleChildScrollView(
+                child: Padding(
+                  padding: const EdgeInsets.all(24),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // Drag handle
+                      Center(
+                        child: Container(
+                          width: 40,
+                          height: 4,
+                          decoration: BoxDecoration(
+                            color: PhantomColors.bgElevated,
+                            borderRadius: BorderRadius.circular(2),
                           ),
                         ),
                       ),
+                      const SizedBox(height: 20),
+
+                      Text(
+                        isRequestSent ? 'Approve Payment' : 'UPI Payment',
+                        style: GoogleFonts.outfit(
+                          fontSize: 22,
+                          fontWeight: FontWeight.w700,
+                          color: PhantomColors.textPrimary,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        isRequestSent
+                            ? 'Check your UPI app to complete the purchase'
+                            : 'Enter your UPI ID to request a payment for ${planName.toUpperCase()}',
+                        style: GoogleFonts.inter(
+                          fontSize: 13,
+                          color: PhantomColors.textSecondary,
+                        ),
+                      ),
+                      const SizedBox(height: 24),
+
+                      if (!isRequestSent) ...[
+                        Text(
+                          'UPI ID / VPA',
+                          style: GoogleFonts.inter(
+                            fontSize: 13,
+                            color: PhantomColors.textSecondary,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        TextField(
+                          controller: upiController,
+                          style: GoogleFonts.inter(color: PhantomColors.textPrimary),
+                          decoration: InputDecoration(
+                            hintText: 'username@upi',
+                            filled: true,
+                            fillColor: PhantomColors.bgCardLight,
+                            prefixIcon: const Icon(Icons.account_balance_wallet_rounded, color: PhantomColors.primaryStart),
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
+                              borderSide: const BorderSide(color: PhantomColors.border),
+                            ),
+                            enabledBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
+                              borderSide: const BorderSide(color: PhantomColors.border),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 24),
+
+                        if (paymentError != null) ...[
+                          Padding(
+                            padding: const EdgeInsets.only(bottom: 16),
+                            child: Text(
+                              paymentError!,
+                              style: GoogleFonts.inter(
+                                color: PhantomColors.danger,
+                                fontSize: 13,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ),
+                        ],
+
+                        // Pay Button
+                        SizedBox(
+                          width: double.infinity,
+                          height: 52,
+                          child: Container(
+                            decoration: BoxDecoration(
+                              gradient: isProcessing ? null : PhantomColors.primaryGradient,
+                              color: isProcessing ? PhantomColors.bgCardLight : null,
+                              borderRadius: BorderRadius.circular(14),
+                              border: isProcessing ? Border.all(color: PhantomColors.border) : null,
+                            ),
+                            child: Material(
+                              color: Colors.transparent,
+                              child: InkWell(
+                                onTap: isProcessing
+                                    ? null
+                                    : () {
+                                        if (upiController.text.isEmpty || !upiController.text.contains('@')) {
+                                          setSheetState(() => paymentError = 'Please enter a valid UPI ID');
+                                          return;
+                                        }
+
+                                        setSheetState(() {
+                                          isProcessing = true;
+                                          paymentError = null;
+                                        });
+
+                                        // Simulate sending UPI Request
+                                        Future.delayed(const Duration(seconds: 2), () {
+                                          setSheetState(() {
+                                            isProcessing = false;
+                                            isRequestSent = true;
+                                          });
+
+                                          // Simulate checking/approving payment after 4 seconds
+                                          Future.delayed(const Duration(seconds: 4), () async {
+                                            if (!context.mounted) return;
+                                            setSheetState(() {
+                                              isProcessing = true;
+                                            });
+
+                                            try {
+                                              await ref.read(settingsProvider.notifier).upgradeSubscription(planName);
+                                              if (context.mounted) {
+                                                Navigator.pop(context); // Close bottom sheet
+                                                ScaffoldMessenger.of(context).showSnackBar(
+                                                  SnackBar(
+                                                    content: Text('Payment Approved! Switched to ${planName.toUpperCase()} plan!'),
+                                                    backgroundColor: PhantomColors.success,
+                                                    behavior: SnackBarBehavior.floating,
+                                                    shape: RoundedRectangleBorder(
+                                                      borderRadius: BorderRadius.circular(12),
+                                                    ),
+                                                  ),
+                                                );
+                                              }
+                                            } catch (e) {
+                                              if (context.mounted) {
+                                                setSheetState(() {
+                                                  isRequestSent = false;
+                                                  isProcessing = false;
+                                                  paymentError = 'Failed to activate plan. Please try again.';
+                                                });
+                                              }
+                                            }
+                                          });
+                                        });
+                                      },
+                                borderRadius: BorderRadius.circular(14),
+                                child: Center(
+                                  child: isProcessing
+                                      ? const SizedBox(
+                                          width: 24,
+                                          height: 24,
+                                          child: CircularProgressIndicator(
+                                            color: PhantomColors.primaryStart,
+                                            strokeWidth: 2,
+                                          ),
+                                        )
+                                      : Text(
+                                          'Send Payment Request',
+                                          style: GoogleFonts.outfit(
+                                            fontSize: 16,
+                                            fontWeight: FontWeight.w600,
+                                            color: Colors.white,
+                                          ),
+                                        ),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ] else ...[
+                        // Request Sent State
+                        Center(
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(vertical: 24),
+                            child: Column(
+                              children: [
+                                const SizedBox(
+                                  width: 56,
+                                  height: 56,
+                                  child: CircularProgressIndicator(
+                                    color: PhantomColors.primaryStart,
+                                    strokeWidth: 3,
+                                  ),
+                                ),
+                                const SizedBox(height: 24),
+                                Text(
+                                  'Checking for approval...',
+                                  style: GoogleFonts.outfit(
+                                    fontSize: 18,
+                                    fontWeight: FontWeight.w600,
+                                    color: PhantomColors.textPrimary,
+                                  ),
+                                ),
+                                const SizedBox(height: 12),
+                                RichText(
+                                  textAlign: TextAlign.center,
+                                  text: TextSpan(
+                                    style: GoogleFonts.inter(
+                                      color: PhantomColors.textSecondary,
+                                      fontSize: 14,
+                                      height: 1.5,
+                                    ),
+                                    children: [
+                                      const TextSpan(text: 'We\'ve sent a payment request to '),
+                                      TextSpan(
+                                        text: upiController.text,
+                                        style: const TextStyle(
+                                          fontWeight: FontWeight.bold,
+                                          color: PhantomColors.primaryStart,
+                                        ),
+                                      ),
+                                      const TextSpan(text: '.\nPlease open your UPI client app to approve it.'),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ],
+                      const SizedBox(height: 12),
                     ],
-                  ],
-                ),
-                Text(
-                  feature,
-                  style: GoogleFonts.inter(
-                    fontSize: 12,
-                    color: PhantomColors.textSecondary,
                   ),
                 ),
-              ],
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Widget _buildPlanRow(String name, String price, String feature, bool isCurrent, VoidCallback onTap) {
+    return InkWell(
+      onTap: isCurrent ? null : onTap,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 4),
+        child: Row(
+          children: [
+            Container(
+              width: 8,
+              height: 8,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: isCurrent
+                    ? PhantomColors.primaryStart
+                    : PhantomColors.textTertiary,
+              ),
             ),
-          ),
-          Text(
-            price,
-            style: GoogleFonts.outfit(
-              fontSize: 14,
-              fontWeight: FontWeight.w600,
-              color: PhantomColors.textPrimary,
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Text(
+                        name,
+                        style: GoogleFonts.outfit(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w600,
+                          color: isCurrent
+                              ? PhantomColors.primaryStart
+                              : PhantomColors.textPrimary,
+                        ),
+                      ),
+                      if (isCurrent) ...[
+                        const SizedBox(width: 8),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 6,
+                            vertical: 2,
+                          ),
+                          decoration: BoxDecoration(
+                            color: PhantomColors.primaryStart.withValues(alpha: 0.15),
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: Text(
+                            'CURRENT',
+                            style: GoogleFonts.inter(
+                              fontSize: 9,
+                              fontWeight: FontWeight.w700,
+                              color: PhantomColors.primaryStart,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                  Text(
+                    feature,
+                    style: GoogleFonts.inter(
+                      fontSize: 12,
+                      color: PhantomColors.textSecondary,
+                    ),
+                  ),
+                ],
+              ),
             ),
-          ),
-        ],
+            Text(
+              price,
+              style: GoogleFonts.outfit(
+                fontSize: 14,
+                fontWeight: FontWeight.w600,
+                color: PhantomColors.textPrimary,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

@@ -8,6 +8,7 @@ import '../../../core/widgets/phantom_app_bar.dart';
 import '../providers/vip_provider.dart';
 import 'package:flutter_contacts/flutter_contacts.dart';
 import 'package:permission_handler/permission_handler.dart';
+import 'package:dio/dio.dart';
 
 class VipListScreen extends ConsumerStatefulWidget {
   const VipListScreen({super.key});
@@ -334,222 +335,283 @@ class _VipListScreenState extends ConsumerState<VipListScreen> {
   void _showAddContactSheet(BuildContext context) {
     final nameController = TextEditingController();
     final phoneController = TextEditingController();
+    bool isSaving = false;
+    String? errorMessage;
 
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (context) {
-        return Container(
-          padding: EdgeInsets.only(
-            bottom: MediaQuery.of(context).viewInsets.bottom,
-          ),
-          decoration: const BoxDecoration(
-            color: PhantomColors.bgCard,
-            borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-            border: Border(
-              top: BorderSide(color: PhantomColors.border),
-              left: BorderSide(color: PhantomColors.border),
-              right: BorderSide(color: PhantomColors.border),
-            ),
-          ),
-          child: SingleChildScrollView(
-            child: Padding(
-              padding: const EdgeInsets.all(24),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Handle bar
-                Center(
-                  child: Container(
-                    width: 40,
-                    height: 4,
-                    decoration: BoxDecoration(
-                      color: PhantomColors.bgElevated,
-                      borderRadius: BorderRadius.circular(2),
-                    ),
-                  ),
+        return StatefulBuilder(
+          builder: (context, setSheetState) {
+            return Container(
+              padding: EdgeInsets.only(
+                bottom: MediaQuery.of(context).viewInsets.bottom,
+              ),
+              decoration: const BoxDecoration(
+                color: PhantomColors.bgCard,
+                borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+                border: Border(
+                  top: BorderSide(color: PhantomColors.border),
+                  left: BorderSide(color: PhantomColors.border),
+                  right: BorderSide(color: PhantomColors.border),
                 ),
-                const SizedBox(height: 20),
-
-                Text(
-                  'Add VIP Contact',
-                  style: GoogleFonts.outfit(
-                    fontSize: 22,
-                    fontWeight: FontWeight.w700,
-                    color: PhantomColors.textPrimary,
-                  ),
-                ),
-                const SizedBox(height: 6),
-                Text(
-                  'This contact will always be able to reach you',
-                  style: GoogleFonts.inter(
-                    fontSize: 13,
-                    color: PhantomColors.textSecondary,
-                  ),
-                ),
-                const SizedBox(height: 16),
-
-                // Pick from Contacts Button
-                SizedBox(
-                  width: double.infinity,
-                  height: 48,
-                  child: OutlinedButton.icon(
-                    onPressed: () async {
-                      if (await Permission.contacts.request().isGranted) {
-                        try {
-                          final contact = await FlutterContacts.openExternalPick();
-                          if (contact != null) {
-                            final fullContact = await FlutterContacts.getContact(contact.id);
-                            if (fullContact != null && fullContact.phones.isNotEmpty) {
-                              nameController.text = fullContact.displayName;
-                              phoneController.text = fullContact.phones.first.number;
-                            }
-                          }
-                        } catch (e) {
-                          // ignore
-                        }
-                      }
-                    },
-                    icon: const Icon(Icons.contacts_rounded, color: PhantomColors.primaryStart, size: 20),
-                    label: Text(
-                      'Choose from Contacts',
-                      style: GoogleFonts.outfit(
-                        fontSize: 15,
-                        fontWeight: FontWeight.w600,
-                        color: PhantomColors.primaryStart,
-                      ),
-                    ),
-                    style: OutlinedButton.styleFrom(
-                      side: const BorderSide(color: PhantomColors.primaryStart),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                    ),
-                  ),
-                ),
-
-                const SizedBox(height: 24),
-
-                // Name field
-                Text(
-                  'Name',
-                  style: GoogleFonts.inter(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w500,
-                    color: PhantomColors.textSecondary,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                TextField(
-                  controller: nameController,
-                  style: GoogleFonts.inter(color: PhantomColors.textPrimary),
-                  decoration: InputDecoration(
-                    hintText: 'Contact name',
-                    prefixIcon: const Icon(
-                      Icons.person_rounded,
-                      color: PhantomColors.textTertiary,
-                    ),
-                    filled: true,
-                    fillColor: PhantomColors.bgCardLight,
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: const BorderSide(color: PhantomColors.border),
-                    ),
-                    enabledBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: const BorderSide(color: PhantomColors.border),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 16),
-
-                // Phone field
-                Text(
-                  'Phone Number',
-                  style: GoogleFonts.inter(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w500,
-                    color: PhantomColors.textSecondary,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                TextField(
-                  controller: phoneController,
-                  keyboardType: TextInputType.phone,
-                  style: GoogleFonts.inter(color: PhantomColors.textPrimary),
-                  decoration: InputDecoration(
-                    hintText: '+91 XXXXX XXXXX',
-                    prefixIcon: const Icon(
-                      Icons.phone_rounded,
-                      color: PhantomColors.textTertiary,
-                    ),
-                    filled: true,
-                    fillColor: PhantomColors.bgCardLight,
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: const BorderSide(color: PhantomColors.border),
-                    ),
-                    enabledBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: const BorderSide(color: PhantomColors.border),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 24),
-
-                // Add button
-                SizedBox(
-                  width: double.infinity,
-                  height: 52,
-                  child: Container(
-                    decoration: BoxDecoration(
-                      gradient: PhantomColors.primaryGradient,
-                      borderRadius: BorderRadius.circular(14),
-                    ),
-                    child: Material(
-                      color: Colors.transparent,
-                      child: InkWell(
-                        onTap: () {
-                          if (nameController.text.isNotEmpty &&
-                              phoneController.text.isNotEmpty) {
-                            ref.read(vipListProvider.notifier).addContact(
-                                  nameController.text,
-                                  phoneController.text,
-                                );
-                            Navigator.pop(context);
-                          }
-                        },
-                        borderRadius: BorderRadius.circular(14),
-                        child: Center(
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              const Icon(Icons.star_rounded,
-                                  color: Colors.white, size: 20),
-                              const SizedBox(width: 8),
-                              Text(
-                                'Add to VIP List',
-                                style: GoogleFonts.outfit(
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.w600,
-                                  color: Colors.white,
-                                ),
-                              ),
-                            ],
+              ),
+              child: SingleChildScrollView(
+                child: Padding(
+                  padding: const EdgeInsets.all(24),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // Handle bar
+                      Center(
+                        child: Container(
+                          width: 40,
+                          height: 4,
+                          decoration: BoxDecoration(
+                            color: PhantomColors.bgElevated,
+                            borderRadius: BorderRadius.circular(2),
                           ),
                         ),
                       ),
-                    ),
+                      const SizedBox(height: 20),
+
+                      Text(
+                        'Add VIP Contact',
+                        style: GoogleFonts.outfit(
+                          fontSize: 22,
+                          fontWeight: FontWeight.w700,
+                          color: PhantomColors.textPrimary,
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      Text(
+                        'This contact will always be able to reach you',
+                        style: GoogleFonts.inter(
+                          fontSize: 13,
+                          color: PhantomColors.textSecondary,
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+
+                      // Pick from Contacts Button
+                      SizedBox(
+                        width: double.infinity,
+                        height: 48,
+                        child: OutlinedButton.icon(
+                          onPressed: isSaving
+                              ? null
+                              : () async {
+                                  if (await Permission.contacts.request().isGranted) {
+                                    try {
+                                      final contact = await FlutterContacts.openExternalPick();
+                                      if (contact != null) {
+                                        final fullContact = await FlutterContacts.getContact(contact.id);
+                                        if (fullContact != null && fullContact.phones.isNotEmpty) {
+                                          setSheetState(() {
+                                            nameController.text = fullContact.displayName;
+                                            phoneController.text = fullContact.phones.first.number;
+                                          });
+                                        }
+                                      }
+                                    } catch (e) {
+                                      // ignore
+                                    }
+                                  }
+                                },
+                          icon: const Icon(Icons.contacts_rounded, color: PhantomColors.primaryStart, size: 20),
+                          label: Text(
+                            'Choose from Contacts',
+                            style: GoogleFonts.outfit(
+                              fontSize: 15,
+                              fontWeight: FontWeight.w600,
+                              color: PhantomColors.primaryStart,
+                            ),
+                          ),
+                          style: OutlinedButton.styleFrom(
+                            side: const BorderSide(color: PhantomColors.primaryStart),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                          ),
+                        ),
+                      ),
+
+                      const SizedBox(height: 24),
+
+                      // Name field
+                      Text(
+                        'Name',
+                        style: GoogleFonts.inter(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w500,
+                          color: PhantomColors.textSecondary,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      TextField(
+                        controller: nameController,
+                        enabled: !isSaving,
+                        style: GoogleFonts.inter(color: PhantomColors.textPrimary),
+                        decoration: InputDecoration(
+                          hintText: 'Contact name',
+                          prefixIcon: const Icon(
+                            Icons.person_rounded,
+                            color: PhantomColors.textTertiary,
+                          ),
+                          filled: true,
+                          fillColor: PhantomColors.bgCardLight,
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: const BorderSide(color: PhantomColors.border),
+                          ),
+                          enabledBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: const BorderSide(color: PhantomColors.border),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+
+                      // Phone field
+                      Text(
+                        'Phone Number',
+                        style: GoogleFonts.inter(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w500,
+                          color: PhantomColors.textSecondary,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      TextField(
+                        controller: phoneController,
+                        enabled: !isSaving,
+                        keyboardType: TextInputType.phone,
+                        style: GoogleFonts.inter(color: PhantomColors.textPrimary),
+                        decoration: InputDecoration(
+                          hintText: '+91 XXXXX XXXXX',
+                          prefixIcon: const Icon(
+                            Icons.phone_rounded,
+                            color: PhantomColors.textTertiary,
+                          ),
+                          filled: true,
+                          fillColor: PhantomColors.bgCardLight,
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: const BorderSide(color: PhantomColors.border),
+                          ),
+                          enabledBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: const BorderSide(color: PhantomColors.border),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 24),
+
+                      if (errorMessage != null) ...[
+                        Padding(
+                          padding: const EdgeInsets.only(bottom: 16),
+                          child: Text(
+                            errorMessage!,
+                            style: GoogleFonts.inter(
+                              color: PhantomColors.danger,
+                              fontSize: 13,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                      ],
+
+                      // Add button
+                      SizedBox(
+                        width: double.infinity,
+                        height: 52,
+                        child: Container(
+                          decoration: BoxDecoration(
+                            gradient: isSaving ? null : PhantomColors.primaryGradient,
+                            color: isSaving ? PhantomColors.bgCardLight : null,
+                            borderRadius: BorderRadius.circular(14),
+                            border: isSaving ? Border.all(color: PhantomColors.border) : null,
+                          ),
+                          child: Material(
+                            color: Colors.transparent,
+                            child: InkWell(
+                              onTap: isSaving
+                                  ? null
+                                  : () async {
+                                      if (nameController.text.isNotEmpty &&
+                                          phoneController.text.isNotEmpty) {
+                                        setSheetState(() {
+                                          isSaving = true;
+                                          errorMessage = null;
+                                        });
+
+                                        try {
+                                          await ref.read(vipListProvider.notifier).addContact(
+                                                nameController.text,
+                                                phoneController.text,
+                                              );
+                                          if (context.mounted) {
+                                            Navigator.pop(context);
+                                          }
+                                        } on DioException catch (e) {
+                                          final msg = e.response?.data['message'] ?? 'Failed to add VIP contact';
+                                          setSheetState(() {
+                                            errorMessage = msg.toString();
+                                          });
+                                        } catch (e) {
+                                          setSheetState(() {
+                                            errorMessage = 'Failed to add VIP contact';
+                                          });
+                                        } finally {
+                                          setSheetState(() {
+                                            isSaving = false;
+                                          });
+                                        }
+                                      }
+                                    },
+                              borderRadius: BorderRadius.circular(14),
+                              child: Center(
+                                child: isSaving
+                                    ? const SizedBox(
+                                        width: 24,
+                                        height: 24,
+                                        child: CircularProgressIndicator(
+                                          color: PhantomColors.primaryStart,
+                                          strokeWidth: 2,
+                                        ),
+                                      )
+                                    : Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          const Icon(Icons.star_rounded,
+                                              color: Colors.white, size: 20),
+                                          const SizedBox(width: 8),
+                                          Text(
+                                            'Add to VIP List',
+                                            style: GoogleFonts.outfit(
+                                              fontSize: 16,
+                                              fontWeight: FontWeight.w600,
+                                              color: Colors.white,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+
+                      const SizedBox(height: 12),
+                    ],
                   ),
                 ),
-
-                const SizedBox(height: 12),
-              ],
-            ),
-          ),
-          ),
+              ),
+            );
+          },
         );
       },
     );
