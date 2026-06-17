@@ -1,4 +1,5 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../../core/network/api_client.dart';
 import '../../../core/constants/api_endpoints.dart';
@@ -47,16 +48,34 @@ class InvisibleNotifier extends StateNotifier<InvisibleState> {
   Future<void> loadStatus() async {
     try {
       final dio = ref.read(dioProvider);
-      final response = await dio.get(ApiEndpoints.invisibleStatus);
-      final data = response.data['data'];
-      if (data != null && mounted) {
+      
+      // Fetch invisible status
+      final statusResponse = await dio.get(ApiEndpoints.invisibleStatus);
+      final statusData = statusResponse.data['data'];
+      
+      // Fetch call stats (blockedToday)
+      final statsResponse = await dio.get(ApiEndpoints.callStats);
+      final statsData = statsResponse.data['data'];
+      final blockedToday = statsData?['blockedToday'] ?? 0;
+      final totalBlocked = statsData?['totalBlocked'] ?? 0;
+
+      // Fetch VIP contacts list
+      final vipResponse = await dio.get(ApiEndpoints.vipList);
+      final vipCount = vipResponse.data['count'] ?? 0;
+
+      if (statusData != null && mounted) {
         state = state.copyWith(
-          isInvisible: data['isInvisible'] ?? false,
-          // Let's assume stats aren't currently returned by this endpoint, we will fetch stats in call log
+          isInvisible: statusData['isInvisible'] ?? false,
+          blockedToday: blockedToday,
+          vipCount: vipCount,
         );
+
+        // Sync blocked count with SharedPreferences for native blocker limits
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setInt('blocked_count', totalBlocked);
       }
     } catch (e) {
-      print('Failed to load status: $e');
+      print('Failed to load status or stats: $e');
     }
   }
 

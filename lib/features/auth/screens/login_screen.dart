@@ -19,6 +19,7 @@ class LoginScreen extends ConsumerStatefulWidget {
 }
 
 class _LoginScreenState extends ConsumerState<LoginScreen> {
+  final _nameController = TextEditingController();
   final _phoneController = TextEditingController();
   final _otpController = TextEditingController();
   bool _otpSent = false;
@@ -26,12 +27,19 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 
   @override
   void dispose() {
+    _nameController.dispose();
     _phoneController.dispose();
     _otpController.dispose();
     super.dispose();
   }
 
   Future<void> _sendOtp() async {
+    if (_nameController.text.trim().isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please enter your name')),
+      );
+      return;
+    }
     if (_phoneController.text.length < 10) return;
     setState(() => _isLoading = true);
     
@@ -56,7 +64,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       final dio = ref.read(dioProvider);
       final response = await dio.post(ApiEndpoints.verifyOtp, data: {
         'phone': '+91${_phoneController.text}',
-        'otp': _otpController.text
+        'otp': _otpController.text,
+        'name': _nameController.text.trim(),
       });
       
       final token = response.data['data']['token'];
@@ -160,6 +169,44 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                 const SizedBox(height: 48),
 
                 if (!_otpSent) ...[
+                  // Name input
+                  Text(
+                    'Full Name',
+                    style: GoogleFonts.inter(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w500,
+                      color: PhantomColors.textSecondary,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Container(
+                    decoration: BoxDecoration(
+                      color: PhantomColors.bgCardLight,
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(color: PhantomColors.border),
+                    ),
+                    child: TextField(
+                      controller: _nameController,
+                      style: GoogleFonts.inter(
+                        fontSize: 16,
+                        color: PhantomColors.textPrimary,
+                      ),
+                      textCapitalization: TextCapitalization.words,
+                      decoration: InputDecoration(
+                        hintText: 'Enter your name',
+                        hintStyle: GoogleFonts.inter(
+                          color: PhantomColors.textTertiary,
+                        ),
+                        border: InputBorder.none,
+                        contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 16,
+                        ),
+                      ),
+                    ),
+                  ).animate().fadeIn(delay: 350.ms, duration: 400.ms),
+                  const SizedBox(height: 20),
+
                   // Phone number input
                   Text(
                     'Phone Number',

@@ -18,7 +18,7 @@ class AppConstants {
   static const int businessVipLimit = -1; // unlimited
   
   // Plan Prices (INR)
-  static const int basicPrice = 49;
+  static const int basicPrice = 1;
   static const int proPrice = 99;
   static const int businessPrice = 199;
   
